@@ -5,7 +5,6 @@ from datetime import datetime, date
 import plotly.express as px
 import plotly.graph_objects as go
 from typing import Dict, List
-from src.utils import load_json_data, get_divisions
 import gspread
 from google.oauth2.service_account import Credentials
 import os

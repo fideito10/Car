@@ -1,6 +1,6 @@
 """
 Sistema Principal del Club Argentino de Rugby (CAR)
-Área Médica y Nutrición
+Centralizacion de Módulos: Área Médica, Nutrición y Física
 Desarrollado con Streamlit
 Fecha: Octubre 2025
 """
@@ -426,7 +426,7 @@ def login_page():
     <div class="main-header">
         <h1>🏉 Club Argentino de Rugby</h1>
         <h3>Sistema de Digitalización</h3>
-        <p>Área Médica y Nutrición</p>
+        <p>Centralizacion de Módulos: Área Médica, Nutrición y Física</p>
     </div>
     """, unsafe_allow_html=True)
     
