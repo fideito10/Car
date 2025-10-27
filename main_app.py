@@ -16,6 +16,10 @@ import plotly.graph_objects as go
 import os
 import sys
 
+# Crear la carpeta 'credentials' si no existe
+if not os.path.exists('credentials'):
+    os.makedirs('credentials')
+
 
 
 # Agregar carpetas al path de Python
@@ -63,14 +67,15 @@ except ImportError:
     mostrar_analisis_nutricion = None
     areanutricion_available = False   
     
-    def load_json_data(filename, default_data=None):
-        """Función de respaldo para cargar JSON"""
-        filepath = os.path.join('data', filename)
-        try:
-            with open(filepath, 'r') as f:
-                return json.load(f)
-        except FileNotFoundError:
-            return default_data if default_data is not None else {}
+
+def load_json_data(filename, default_data=None):
+    """Función de respaldo para cargar JSON"""
+    filepath = os.path.join('credentials', filename)
+    try:
+        with open(filepath, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return default_data if default_data is not None else {}
 
 # Configuración de la página
 st.set_page_config(
@@ -187,10 +192,11 @@ def load_car_styles():
     """, unsafe_allow_html=True)
 
 class AuthManager:
-    def __init__(self, credentials_file='data/users_credentials.json'):
+    def __init__(self, credentials_file='credentials/users_credentials.json'):
         self.credentials_file = credentials_file
         self.ensure_credentials_file()
-    
+        
+        
     def ensure_credentials_file(self):
         try:
             with open(self.credentials_file, 'r', encoding='utf-8') as f:
@@ -226,7 +232,7 @@ class AuthManager:
 
 class MedicalManager:
     def __init__(self):
-        self.injuries_file = 'data/medical_records.json'
+        self.injuries_file = 'credentials/medical_records.json'
         self.ensure_medical_file()
     
     def ensure_medical_file(self):
@@ -323,7 +329,7 @@ class MedicalManager:
 
 class NutritionManager:
     def __init__(self):
-        self.nutrition_file = 'data/nutrition_records.json'
+        self.nutrition_file = 'credentials/nutrition_records.json'
         self.ensure_nutrition_file()
     
     def ensure_nutrition_file(self):
@@ -720,10 +726,10 @@ def dashboard_main():
     
     # Cargar datos para métricas
     from src.utils import load_json_data
-    medical_data = load_json_data('data/medical_records.json', {'injuries': []})
-    nutrition_data = load_json_data('data/nutrition_records.json', {'meal_plans': []})
-    strength_data = load_json_data('data/strength_tests.json', {'tests': []})
-    field_data = load_json_data('data/field_tests.json', {'tests': []})
+    medical_data = load_json_data('credentials/medical_records.json', {'injuries': []})
+    nutrition_data = load_json_data('credentials/nutrition_records.json', {'meal_plans': []})
+    strength_data = load_json_data('credentials/strength_tests.json', {'tests': []})
+    field_data = load_json_data('credentials/field_tests.json', {'tests': []})
     
     with col1:
         st.markdown("""
