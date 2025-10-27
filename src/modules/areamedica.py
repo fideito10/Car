@@ -12,7 +12,33 @@ from typing import Dict, List, Optional
 import json
 import sys
 import os
+import streamlit as st
+import json
+import os
 
+def get_google_credentials():
+    
+    
+    # Si estamos en Streamlit Cloud, usamos st.secrets
+    if "google" in st.secrets:
+        return {
+            "type": st.secrets["google"]["type"],
+            "project_id": st.secrets["google"]["project_id"],
+            "private_key_id": st.secrets["google"]["private_key_id"],
+            "private_key": st.secrets["google"]["private_key"],
+            "client_email": st.secrets["google"]["client_email"],
+            "client_id": st.secrets["google"]["client_id"],
+            "auth_uri": st.secrets["google"]["auth_uri"],
+            "token_uri": st.secrets["google"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["google"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["google"]["client_x509_cert_url"],
+            "universe_domain": st.secrets["google"].get("universe_domain", "googleapis.com"),
+        }
+    # Si estamos local, leemos el archivo
+    else:
+        cred_path = os.path.join("credentials", "service_account.json")
+        with open(cred_path) as f:
+            return json.load(f)
 # Configurar el path para importaciones
 current_dir = os.path.dirname(__file__)
 parent_dir = os.path.dirname(os.path.dirname(current_dir))
@@ -31,7 +57,10 @@ except ImportError:
 
 import gspread
 from google.oauth2.service_account import Credentials
+from google.oauth2.service_account import Credentials
 
+creds_info = get_google_credentials()
+creds = Credentials.from_service_account_info(creds_info)
 
 with st.sidebar:
         st.header("🔧 Configuración")
@@ -71,38 +100,36 @@ def read_google_sheet_with_headers(sheet_id=None, worksheet_name=None, credentia
     if sheet_id is None:
         sheet_id = '1zGyW-M_VV7iyDKVB1TTd0EEP3QBjdoiBmSJN2tK-H7w'
     
-    # Buscar archivo de credenciales
-    if credentials_path is None:
-        alternative_paths = [
-            "../credentials/service_account.json",
-            "credentials/service_account.json",
-            "C:/Users/dell/Desktop/Car/credentials/service_account.json"
-        ]
-        
-        for path in alternative_paths:
-            if os.path.exists(path):
-                credentials_path = path
-                break
-    
-    if not credentials_path:
-        return {
-            'success': False,
-            'data': None,
-            'columns': None,
-            'message': 'Archivo de credenciales no encontrado'
-        }
-    
+    # --- NUEVO: Obtener credenciales de la forma correcta ---
     try:
-        # Autenticación
         SCOPES = [
             'https://www.googleapis.com/auth/spreadsheets',
             'https://www.googleapis.com/auth/drive'
         ]
-        
-        credentials = Credentials.from_service_account_file(
-            credentials_path, 
-            scopes=SCOPES
-        )
+        # Si estamos en Streamlit Cloud (st.secrets), usamos from_service_account_info
+        if "google" in st.secrets:
+            creds_info = get_google_credentials()
+            credentials = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+        else:
+            # Si estamos local, buscamos el archivo
+            if credentials_path is None:
+                alternative_paths = [
+                    "../credentials/service_account.json",
+                    "credentials/service_account.json",
+                    "C:/Users/dell/Desktop/Car/credentials/service_account.json"
+                ]
+                for path in alternative_paths:
+                    if os.path.exists(path):
+                        credentials_path = path
+                        break
+            if not credentials_path:
+                return {
+                    'success': False,
+                    'data': None,
+                    'columns': None,
+                    'message': 'Archivo de credenciales no encontrado'
+                }
+            credentials = Credentials.from_service_account_file(credentials_path, scopes=SCOPES)
         
         gc = gspread.authorize(credentials)
         
@@ -113,15 +140,12 @@ def read_google_sheet_with_headers(sheet_id=None, worksheet_name=None, credentia
         if worksheet_name:
             worksheet = sh.worksheet(worksheet_name)
         else:
-            # Buscar por ID específico (gid=982269766) o usar la primera
             worksheets = sh.worksheets()
             worksheet = None
-            
             for ws in worksheets:
                 if ws.id == 982269766:
                     worksheet = ws
                     break
-            
             if worksheet is None:
                 worksheet = sh.get_worksheet(0)
         
@@ -143,7 +167,6 @@ def read_google_sheet_with_headers(sheet_id=None, worksheet_name=None, credentia
         # Crear lista de diccionarios (cada fila es un diccionario)
         structured_data = []
         for row in data_rows:
-            # Asegurar que la fila tenga la misma longitud que las columnas
             row_data = {}
             for i, column in enumerate(columns):
                 value = row[i] if i < len(row) else ''
