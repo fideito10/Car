@@ -208,6 +208,7 @@ def read_google_sheet_with_headers(sheet_id=None, worksheet_name=None, credentia
             'message': f'Error inesperado: {e}'
         }
 
+
 def create_dataframe_from_sheet(sheet_id=None, worksheet_name=None):
     """
     Crea un DataFrame de pandas desde el Google Sheet
