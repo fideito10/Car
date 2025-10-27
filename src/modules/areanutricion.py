@@ -10,6 +10,30 @@ from plotly.subplots import make_subplots
 import gspread  # ← IMPORTANTE: Agregar este import
 import re
 
+
+def get_google_credentials():
+    # Si estamos en Streamlit Cloud, usamos st.secrets
+    if "google" in st.secrets:
+        return {
+            "type": st.secrets["google"]["type"],
+            "project_id": st.secrets["google"]["project_id"],
+            "private_key_id": st.secrets["google"]["private_key_id"],
+            "private_key": st.secrets["google"]["private_key"],
+            "client_email": st.secrets["google"]["client_email"],
+            "client_id": st.secrets["google"]["client_id"],
+            "auth_uri": st.secrets["google"]["auth_uri"],
+            "token_uri": st.secrets["google"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["google"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["google"]["client_x509_cert_url"],
+            "universe_domain": st.secrets["google"].get("universe_domain", "googleapis.com"),
+        }
+    # Si estamos local, leemos el archivo
+    else:
+        cred_path = os.path.join("credentials", "service_account.json")
+        with open(cred_path) as f:
+            return json.load(f)
+        
+        
 def read_new_google_sheet_to_df(
     sheet_id='12SqV7eAYpCwePD-TA1R1XOou-nGO3R6QUSHUnxa8tAI',
     target_gid=382913329,
@@ -18,64 +42,68 @@ def read_new_google_sheet_to_df(
     """
     Lee un Google Sheet específico y devuelve un DataFrame de pandas.
     """
-    if credentials_paths is None:
-        credentials_paths = [
-            "../credentials/service_account.json",
-            "credentials/service_account.json",
-            "C:/Users/dell/Desktop/Car/credentials/service_account.json",
-            "service_account.json"
-        ]
-    
-    credentials_path = None
-    for path in credentials_paths:
-        if os.path.exists(path):
-            credentials_path = path
-            break
-    
-    if not credentials_path:
-        st.error(f"❌ Archivo de credenciales no encontrado en las rutas: {credentials_paths}")
-        st.info("🔧 Verifica que el archivo service_account.json esté en una de estas ubicaciones")
-        return None
+    import gspread
+    from google.oauth2.service_account import Credentials
+
+    SCOPES = [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive'
+    ]
 
     try:
-        SCOPES = [
-            'https://www.googleapis.com/auth/spreadsheets',
-            'https://www.googleapis.com/auth/drive'
-        ]
-        credentials = Credentials.from_service_account_file(
-            credentials_path, 
-            scopes=SCOPES
-        )
+        # Usar st.secrets si está en Cloud
+        if "google" in st.secrets:
+            creds_info = get_google_credentials()
+            credentials = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+        else:
+            if credentials_paths is None:
+                credentials_paths = [
+                    "../credentials/service_account.json",
+                    "credentials/service_account.json",
+                    "C:/Users/dell/Desktop/Car/credentials/service_account.json",
+                    "service_account.json"
+                ]
+            credentials_path = None
+            for path in credentials_paths:
+                if os.path.exists(path):
+                    credentials_path = path
+                    break
+            if not credentials_path:
+                st.error(f"❌ Archivo de credenciales no encontrado en las rutas: {credentials_paths}")
+                st.info("🔧 Verifica que el archivo service_account.json esté en una de estas ubicaciones")
+                return None
+            credentials = Credentials.from_service_account_file(credentials_path, scopes=SCOPES)
+
         gc = gspread.authorize(credentials)
         sh = gc.open_by_key(sheet_id)
-        
+
         # Obtener la hoja de trabajo específica por GID
         worksheet = None
         for sheet in sh.worksheets():
             if str(sheet.id) == str(target_gid):
                 worksheet = sheet
                 break
-        
+
         if worksheet is None:
             st.error(f"❌ No se encontró la hoja con GID: {target_gid}")
             return None
-        
+
         # Leer todos los datos
         data = worksheet.get_all_records()
-        
+
         if not data:
             st.warning("⚠️ La hoja está vacía")
             return pd.DataFrame()
-        
+
         # Convertir a DataFrame
         df = pd.DataFrame(data)
-        
+
         # Limpiar datos vacíos
         df = df.dropna(how='all')
         df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-        
+
         return df
-        
+
     except FileNotFoundError:
         st.error("❌ Archivo de credenciales no encontrado")
         return None

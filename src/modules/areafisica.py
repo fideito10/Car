@@ -14,23 +14,71 @@ from google.oauth2.service_account import Credentials
 
 
 
+def get_google_credentials():
+    # Si estamos en Streamlit Cloud, usamos st.secrets
+    if "google" in st.secrets:
+        return {
+            "type": st.secrets["google"]["type"],
+            "project_id": st.secrets["google"]["project_id"],
+            "private_key_id": st.secrets["google"]["private_key_id"],
+            "private_key": st.secrets["google"]["private_key"],
+            "client_email": st.secrets["google"]["client_email"],
+            "client_id": st.secrets["google"]["client_id"],
+            "auth_uri": st.secrets["google"]["auth_uri"],
+            "token_uri": st.secrets["google"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["google"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["google"]["client_x509_cert_url"],
+            "universe_domain": st.secrets["google"].get("universe_domain", "googleapis.com"),
+        }
+    # Si estamos local, leemos el archivo
+    else:
+        cred_path = os.path.join("credentials", "service_account.json")
+        with open(cred_path) as f:
+            return json.load(f)
 def cargar_hoja(sheet_id: str, nombre_hoja: str, rutas_credenciales=None) -> pd.DataFrame:
     """
     Carga una hoja de Google Sheets usando el sheet_id y el nombre de la pestaña.
     """
-    if rutas_credenciales is None:
-        rutas_credenciales = [
-            "../credentials/service_account.json",
-            "credentials/service_account.json",
-            "C:/Users/dell/Desktop/Car/credentials/service_account.json"
-        ]
-    credenciales_path = None
-    for path in rutas_credenciales:
-        if os.path.exists(path):
-            credenciales_path = path
-            break
-    if not credenciales_path:
-        print("❌ Archivo de credenciales no encontrado")
+    SCOPES = [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive'
+    ]
+    try:
+        # Si estamos en Streamlit Cloud, usamos st.secrets
+        if "google" in st.secrets:
+            creds_info = get_google_credentials()
+            credenciales = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
+        else:
+            if rutas_credenciales is None:
+                rutas_credenciales = [
+                    "../credentials/service_account.json",
+                    "credentials/service_account.json",
+                    "C:/Users/dell/Desktop/Car/credentials/service_account.json"
+                ]
+            credenciales_path = None
+            for path in rutas_credenciales:
+                if os.path.exists(path):
+                    credenciales_path = path
+                    break
+            if not credenciales_path:
+                print("❌ Archivo de credenciales no encontrado")
+                return pd.DataFrame()
+            credenciales = Credentials.from_service_account_file(credenciales_path, scopes=SCOPES)
+
+        gc = gspread.authorize(credenciales)
+        sh = gc.open_by_key(sheet_id)
+        worksheet = sh.worksheet(nombre_hoja)
+        all_data = worksheet.get_all_values()
+        if not all_data:
+            print("⚠️ La hoja está vacía")
+            return pd.DataFrame()
+        columns = all_data[0]
+        data_rows = all_data[1:]
+        df = pd.DataFrame(data_rows, columns=columns)
+        return df
+
+    except Exception as e:
+        print(f"❌ Error al cargar la hoja: {e}")
         return pd.DataFrame()
 
     # Mueve la configuración visual fuera de SCOPES
