@@ -15,6 +15,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import os
 import sys
+from google.oauth2 import service_account
 
 # Crear la carpeta 'credentials' si no existe
 if not os.path.exists('credentials'):
@@ -78,6 +79,15 @@ except ImportError:
 
 
 
+def get_gcp_credentials():
+    """Obtener credenciales de Google Cloud desde Streamlit secrets"""
+    try:
+        gcp_service_account = st.secrets["gcp_service_account"]
+        credentials = service_account.Credentials.from_service_account_info(gcp_service_account)
+        return credentials
+    except Exception as e:
+        st.error(f"Error al cargar credenciales: {e}")
+        return None
 
 def load_json_data(filename, default_data=None):
     """Función de respaldo para cargar JSON"""

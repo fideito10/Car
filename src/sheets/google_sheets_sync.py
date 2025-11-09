@@ -24,9 +24,18 @@ class GoogleSheetsCAR:
         self.setup_credentials()
     
     def setup_credentials(self):
-        """Configurar credenciales de Google"""
+        """Configurar credenciales de Google desde st.secrets o archivo local"""
         try:
-            # Intentar cargar desde archivo de credenciales
+            # Primero intentar obtener desde st.secrets (para Streamlit Cloud)
+            if hasattr(st, 'secrets') and "gcp_service_account" in st.secrets:
+                creds = Credentials.from_service_account_info(
+                    dict(st.secrets["gcp_service_account"]), 
+                    scopes=self.scope
+                )
+                self.client = gspread.authorize(creds)
+                return True
+            
+            # Si estamos local, intentar cargar desde archivo
             creds_path = "data/car_google_credentials.json"
             if os.path.exists(creds_path):
                 creds = Credentials.from_service_account_file(

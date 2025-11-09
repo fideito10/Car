@@ -11,33 +11,17 @@ import os
 
 def get_google_credentials():
     """
-    Obtiene las credenciales de Google de forma segura
+    Obtiene las credenciales de Google de forma segura desde st.secrets o archivo local
     """
     try:
-        # Verificar si st.secrets está disponible y tiene datos de Google
-        if hasattr(st, 'secrets') and hasattr(st.secrets, '_file_paths') and st.secrets._file_paths:
-            # Solo verificar si el archivo secrets existe
-            if "google" in st.secrets:
-                return {
-                    "type": st.secrets["google"]["type"],
-                    "project_id": st.secrets["google"]["project_id"],
-                    "private_key_id": st.secrets["google"]["private_key_id"],
-                    "private_key": st.secrets["google"]["private_key"],
-                    "client_email": st.secrets["google"]["client_email"],
-                    "client_id": st.secrets["google"]["client_id"],
-                    "auth_uri": st.secrets["google"]["auth_uri"],
-                    "token_uri": st.secrets["google"]["token_uri"],
-                    "auth_provider_x509_cert_url": st.secrets["google"]["auth_provider_x509_cert_url"],
-                    "client_x509_cert_url": st.secrets["google"]["client_x509_cert_url"],
-                    "universe_domain": st.secrets["google"].get("universe_domain", "googleapis.com"),
-                }
+        # Primero intentar obtener desde st.secrets (para Streamlit Cloud)
+        if hasattr(st, 'secrets') and "gcp_service_account" in st.secrets:
+            return dict(st.secrets["gcp_service_account"])
     except Exception:
-        # Si hay cualquier error con secrets, continuar con archivos locales
         pass
     
-    # Si estamos local o no hay secrets, leemos el archivo
+    # Si estamos local o no hay secrets, leer archivo
     try:
-        # Buscar el archivo de credenciales en varias ubicaciones
         possible_paths = [
             "credentials/service_account.json",
             "../credentials/service_account.json", 
@@ -49,7 +33,6 @@ def get_google_credentials():
                 with open(cred_path) as f:
                     return json.load(f)
         
-        # Si no encuentra ningún archivo
         raise FileNotFoundError("No se encontró archivo de credenciales")
         
     except Exception as e:
