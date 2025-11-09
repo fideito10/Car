@@ -45,13 +45,15 @@ except ImportError:
 
 # Importar módulo de Formularios Médicos
 try:
-    from src.modules.areamedica import main_streamlit as area_medica_main
+    # LAZY LOADING - no importar directamente
+    area_medica_main = None
     formularios_medicos_available = True
     area_medica_enhanced_available = True
 except ImportError:
     area_medica_main = None
     formularios_medicos_available = False
     area_medica_enhanced_available = False
+    
 # Importar utilidades
 try:
     from src.utils import load_json_data
@@ -67,6 +69,15 @@ except ImportError:
     mostrar_analisis_nutricion = None
     areanutricion_available = False   
     
+try:
+    from src.modules.dashboard_360 import dashboard_360
+    dashboard_360_available = True
+except ImportError:
+    dashboard_360 = None
+    dashboard_360_available = False
+
+
+
 
 def load_json_data(filename, default_data=None):
     """Función de respaldo para cargar JSON"""
@@ -469,35 +480,25 @@ def login_page():
         # Credenciales de prueba
         st.info("🔑 **Credenciales de prueba:**\n\n**Usuario:** admin\n\n**Contraseña:** admin123")
 
+
 def medical_area():
     """Área médica usando el sistema completo de areamedica.py"""
     
     try:
-        # Usar la función main_streamlit() que ya existe en areamedica.py
-        if area_medica_main is not None:
-            area_medica_main()
-        else:
-            show_basic_medical_system()
+        # LAZY LOADING - importar solo cuando se necesite
+        from src.modules.areamedica import main_streamlit as area_medica_main
+        
+        # Usar la función main_streamlit() 
+        area_medica_main()
         
     except ImportError as e:
         st.error(f"❌ Error al cargar el módulo de área médica: {e}")
         st.info("🔧 Verifica que el archivo src/modules/areamedica.py esté disponible")
-        
-        # Mostrar sistema médico básico como respaldo
-        show_basic_medical_system()
-        
-    except AttributeError as e:
-        st.error(f"❌ Error de atributo en el área médica: {e}")
-        st.info("🔧 Problema con la configuración de Google Sheets o datos faltantes")
-        
-        # Mostrar sistema médico básico como respaldo
         show_basic_medical_system()
         
     except Exception as e:
         st.error(f"❌ Error inesperado en el área médica: {e}")
-        st.info("🔧 Intenta recargar la página o contacta al administrador")
-        
-        # Mostrar sistema médico básico como respaldo
+        st.info("🔧 Problema con la configuración de Google Sheets")
         show_basic_medical_system()
 
 
@@ -640,7 +641,8 @@ def main_dashboard():
     
     # Menú de navegación
     menu_options = {
-        "🏠 Dashboard Principal": "dashboard",
+        "🏠 Portada": "dashboard",
+        "📊 Panel del Jugador": "dashboard_360",
         "🏥 Área Médica": "medical",
         "🥗 Área Nutrición": "nutricion",
         "🏋️ Área Física": "physical",
@@ -667,16 +669,15 @@ def main_dashboard():
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("**📞 Contacto CAR:**")
-    st.sidebar.markdown("📧 info@car.com.ar")
-    st.sidebar.markdown("📱 (011) 4XXX-XXXX")
-    
+    st.sidebar.markdown("📧 calvoj550@mail.com")
+    st.sidebar.markdown("📱 (2213571957)")
+
     # ✅ NAVEGACIÓN CORREGIDA
     if st.session_state.current_page == "dashboard":
         dashboard_main()
         
     elif st.session_state.current_page == "medical":
         medical_area()
-        
         
     elif st.session_state.current_page == "nutricion":
         # ✅ Usar el módulo avanzado de nutrición
@@ -689,12 +690,29 @@ def main_dashboard():
         else:
             st.error("❌ Módulo de Área de Nutrición no disponible")
             st.info("🔧 Verifica que el archivo src/modules/areanutricion.py esté correctamente configurado")
-            st.info("🔧 También verifica que todas las dependencias estén instaladas (pandas, plotly, streamlit)")
 
-
-            
     elif st.session_state.current_page == "physical":
         physical_page()
+    
+    # AGREGAR ESTA NUEVA SECCIÓN
+    elif st.session_state.current_page == "dashboard_360":
+        if dashboard_360_available and dashboard_360 is not None:
+            try:
+                dashboard_360()
+            except Exception as e:
+                st.error(f"❌ Error en el Panel del Jugador: {e}")
+                st.info("🔧 Verifica la configuración del módulo dashboard_360.py")
+                st.info("💡 Asegúrate de que los módulos médico, físico y nutrición estén funcionando")
+        else:
+            st.error("❌ Panel del Jugador no disponible")
+            st.info("🔧 Verifica que el archivo src/modules/360.py esté presente")
+            st.info("📋 Funcionalidades requeridas:")
+            st.code("""
+            - src/modules/360.py
+            - src/modules/areamedica.py  
+            - src/modules/areafisica.py
+            - src/modules/areanutricion.py
+            """)
         
     elif st.session_state.current_page == "settings":
         settings_page()
@@ -705,230 +723,192 @@ def main_dashboard():
         st.info("🔄 Regresando al dashboard principal...")
         st.session_state.current_page = "dashboard"
         st.rerun()
-        
+
+
 
 def dashboard_main():
-    """Dashboard principal del sistema CAR - Versión comercial"""
+    """Dashboard principal del sistema CAR - Versión comercial simplificada"""
     
-    # Header principal con diseño comercial
+    # CSS personalizado con tu branding
     st.markdown("""
-    <div class="main-header" style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); padding: 2rem; border-radius: 15px; margin-bottom: 2rem;">
-        <h1 style="color: white; text-align: center; font-size: 3rem; margin-bottom: 0.5rem;">⚡ CAR Digital System</h1>
-        <h3 style="color: #e8f4fd; text-align: center; font-weight: 300;">Sistema Integral de Gestión Deportiva Profesional</h3>
-        <p style="color: #b8d4f0; text-align: center; font-size: 1.1rem; margin-top: 1rem;">
-            🏆 La solución completa para clubs de rugby modernos
-        </p>
+    <style>
+    .hero-container {
+        background: linear-gradient(135deg, #0B132B 0%, #1E90FF 100%);
+        padding: 3rem 2rem;
+        border-radius: 20px;
+        margin-bottom: 2rem;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .hero-content {
+        flex: 2;
+        color: white;
+    }
+    .hero-logo {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-left: 2rem;
+    }
+    .hero-title {
+        color: white;
+        font-size: 48px;
+        font-weight: 900;
+        margin-bottom: 15px;
+        line-height: 1.1;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+    }
+    .hero-accent {
+        color: #39FF14;
+    }
+    .hero-subtitle {
+        color: rgba(255,255,255,0.9);
+        font-size: 22px;
+        font-weight: 400;
+        margin-bottom: 15px;
+    }
+    .hero-description {
+        color: rgba(255,255,255,0.8);
+        font-size: 17px;
+        margin-bottom: 0;
+        line-height: 1.4;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Contenedor azul con título, subtítulo y logo
+    st.markdown("""
+    <div class="hero-container">
+        <div class="hero-content">
+            <h1 class="hero-title">
+                SISTEMA DE<br>
+                <span class="hero-accent">RENDIMIENTO ELITE</span>
+            </h1>
+            <h2 class="hero-subtitle">
+                La plataforma integral que revoluciona la gestión deportiva
+            </h2>
+            <p class="hero-description">
+                Centralizamos datos médicos, físicos y nutricionales para una toma de decisiones inteligente
+            </p>
+        </div>
+        <div class="hero-logo">
+    """, unsafe_allow_html=True)
+    
+    # Logo dentro del contenedor
+    try:
+        st.image(r"C:\Users\dell\Desktop\Car\logo.png", width=200)
+    except:
+        # Respaldo con logo estilizado
+        st.markdown("""
+        <div style="
+            background: linear-gradient(45deg, #39FF14, #1E90FF); 
+            width: 150px; height: 150px; 
+            border-radius: 20px; 
+            display: flex; align-items: center; justify-content: center; 
+            color: #0B132B; font-size: 36px; font-weight: 900;
+            margin: 0 auto;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        ">
+            SRE
+        </div>
+        """, unsafe_allow_html=True)
+    
+    st.markdown("""
+        </div>
     </div>
     """, unsafe_allow_html=True)
     
-    # Métricas principales del sistema
-    col1, col2, col3, col4 = st.columns(4)
+    # Los Principios de la Digitalización - Versión Streamlit nativa
+    st.markdown("## 🚀 Los Principios de la Digitalización Deportiva")
+    st.markdown("---")
     
-    # Cargar datos para métricas
-    from src.utils import load_json_data
-    medical_data = load_json_data('credentials/medical_records.json', {'injuries': []})
-    nutrition_data = load_json_data('credentials/nutrition_records.json', {'meal_plans': []})
-    strength_data = load_json_data('credentials/strength_tests.json', {'tests': []})
-    field_data = load_json_data('credentials/field_tests.json', {'tests': []})
+    # Principio 1
+    st.markdown("### 1️⃣ **Capacitación Profesional**")
+    st.write("""
+    La digitalización exitosa comienza con profesionales capacitados. Nuestro sistema no solo te da las herramientas, 
+    sino que **forma a tu equipo** para maximizar el potencial de cada dato recopilado.
+    """)
     
-    with col1:
-        st.markdown("""
-        <div class="metric-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 1.5rem; border-radius: 10px; text-align: center; color: white;">
-            <h2 style="margin: 0; font-size: 2.5rem;">🏥</h2>
-            <h3 style="margin: 0.5rem 0; font-size: 2rem;">{}</h3>
-            <p style="margin: 0; opacity: 0.9;">Área Médica</p>
-            <small style="opacity: 0.7;">Registros médicos</small>
-        </div>
-        """.format(len(medical_data.get('injuries', []))), unsafe_allow_html=True)
+    # Principio 2  
+    st.markdown("### 2️⃣ **Centralización de Información**")
+    st.write("""
+    Todos los datos en un solo lugar: rendimiento físico, análisis técnico, bienestar del jugador y métricas de salud. 
+    La **centralización** elimina silos de información y permite una visión integral del atleta.
+    """)
     
-    with col2:
-        st.markdown("""
-        <div class="metric-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 1.5rem; border-radius: 10px; text-align: center; color: white;">
-            <h2 style="margin: 0; font-size: 2.5rem;">🥗</h2>
-            <h3 style="margin: 0.5rem 0; font-size: 2rem;">{}</h3>
-            <p style="margin: 0; opacity: 0.9;">Área Nutrición</p>
-            <small style="opacity: 0.7;">Planes nutricionales</small>
-        </div>
-        """.format(len(nutrition_data.get('meal_plans', []))), unsafe_allow_html=True)
+    # Principio 3
+    st.markdown("### 3️⃣ **Toma de Decisiones Basada en Datos**")
+    st.write("""
+    Con información centralizada y profesionales capacitados, las decisiones dejan de ser intuitivas para convertirse en 
+    **estratégicas y fundamentadas**. Cada cambio de entrenamiento, cada rotación, cada plan nutricional tiene respaldo científico.
+    """)
     
-    with col3:
-        st.markdown("""
-        <div class="metric-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 1.5rem; border-radius: 10px; text-align: center; color: white;">
-            <h2 style="margin: 0; font-size: 2.5rem;">💪</h2>
-            <h3 style="margin: 0.5rem 0; font-size: 2rem;">{}</h3>
-            <p style="margin: 0; opacity: 0.9;">Tests Fuerza</p>
-            <small style="opacity: 0.7;">Evaluaciones físicas</small>
-        </div>
-        """.format(len(strength_data.get('tests', []))), unsafe_allow_html=True)
+    # Beneficios de la Digitalización - Versión Streamlit nativa
+    st.markdown("## 💡 ¿Por qué digitalizar tu club deportivo?")
+    st.markdown("---")
     
-    with col4:
-        st.markdown("""
-        <div class="metric-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); padding: 1.5rem; border-radius: 10px; text-align: center; color: white;">
-            <h2 style="margin: 0; font-size: 2.5rem;">🏃</h2>
-            <h3 style="margin: 0.5rem 0; font-size: 2rem;">{}</h3>
-            <p style="margin: 0; opacity: 0.9;">Tests Campo</p>
-            <small style="opacity: 0.7;">Evaluaciones de campo</small>
-        </div>
-        """.format(len(field_data.get('tests', []))), unsafe_allow_html=True)
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # Sección de beneficios del sistema (para venta)
-    st.markdown("""
-    <div style="background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin: 2rem 0;">
-        <h2 style="color: #1e3c72; text-align: center; margin-bottom: 2rem;">🚀 ¿Por qué CAR Digital System?</h2>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Beneficios en columnas
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        ### 🎯 **Gestión Centralizada**
-        - ✅ **Toda la información en un solo lugar**
-        - ✅ **Acceso desde cualquier dispositivo**
-        - ✅ **Sincronización en tiempo real**
-        - ✅ **Sin duplicación de datos**
-        
-        ### 🏥 **Área Médica Profesional**
-        - ✅ **Seguimiento completo de lesiones**
-        - ✅ **Historial médico detallado**
-        - ✅ **Planificación de recuperación**
-        - ✅ **Reportes automáticos**
-        
-        ### 💪 **Evaluación Física Integral**
-        - ✅ **Tests de fuerza estandarizados**
-        - ✅ **Evaluaciones de campo completas**
-        - ✅ **Seguimiento de evolución**
-        - ✅ **Cálculos automáticos de 1RM**
-        """)
-    
-    with col2:
-        st.markdown("""
-        ### 🔗 **Integración Google Sheets**
-        - ✅ **Trabajo colaborativo fluido**
-        - ✅ **Sincronización automática**
-        - ✅ **Sin cambios en workflow actual**
-        - ✅ **Backup automático en la nube**
-        
-        ### 🥗 **Nutrición Personalizada**
-        - ✅ **Planes nutricionales específicos**
-        - ✅ **Seguimiento de objetivos**
-        - ✅ **Análisis de macronutrientes**
-        - ✅ **Adaptación por deporte**
-        
-        ### 📊 **Analytics y Reportes**
-        - ✅ **Dashboard interactivo en tiempo real**
-        - ✅ **Métricas de rendimiento**
-        - ✅ **Análisis predictivo**
-        - ✅ **Reportes exportables**
-        """)
-    
-    # ROI y estadísticas comerciales
-    st.markdown("""
-    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 2rem; border-radius: 15px; margin: 2rem 0; color: white;">
-        <h2 style="text-align: center; margin-bottom: 2rem;">📈 Resultados Comprobados</h2>
-    </div>
-    """, unsafe_allow_html=True)
-    
+    # Crear las 3 columnas
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.markdown("""
-        <div style="text-align: center; padding: 1rem;">
-            <h1 style="color: #43e97b; font-size: 3rem; margin: 0;">85%</h1>
-            <h3 style="color: #333; margin: 0.5rem 0;">Reducción en</h3>
-            <p style="color: #666;">Tiempo de gestión administrativa</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("### 📈 **Mejora del Rendimiento**")
+        st.write("- **Monitoreo en tiempo real** de métricas clave de cada atleta")
+        st.write("- **Prevención de lesiones** mediante análisis predictivo")
+        st.write("- **Optimización de entrenamientos** basada en datos objetivos")
     
     with col2:
-        st.markdown("""
-        <div style="text-align: center; padding: 1rem;">
-            <h1 style="color: #f093fb; font-size: 3rem; margin: 0;">60%</h1>
-            <h3 style="color: #333; margin: 0.5rem 0;">Mejora en</h3>
-            <p style="color: #666;">Seguimiento de lesiones</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("### 🎯 **Ventaja Competitiva**")
+        st.write("- **Decisiones estratégicas** respaldadas por información precisa")
+        st.write("- **Identificación de talentos** mediante análisis de rendimiento")
+        st.write("- **Planificación táctica** con base en datos históricos y actuales")
     
     with col3:
-        st.markdown("""
-        <div style="text-align: center; padding: 1rem;">
-            <h1 style="color: #4facfe; font-size: 3rem; margin: 0;">100%</h1>
-            <h3 style="color: #333; margin: 0.5rem 0;">Digitalización</h3>
-            <p style="color: #666;">De procesos manuales</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown("### ⚡ **Eficiencia Operativa**")
+        st.write("- **Reducción de costos** en lesiones y tiempo perdido")
+        st.write("- **Automatización** de reportes y seguimiento")
+        st.write("- **Integración** de todas las áreas del club en una plataforma")
     
-    # Módulos del sistema
+    # Solicitar Demo - Usando tu contenido de demo.py
     st.markdown("""
-    <div style="background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin: 2rem 0;">
-        <h2 style="color: #1e3c72; text-align: center; margin-bottom: 2rem;">🧩 Módulos Integrados</h2>
+    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 2rem; border-radius: 15px; margin: 2rem 0;">
+        <h2 style="color: #39FF14; text-align: center; margin-bottom: 2rem;">Solicitar Demo</h2>
     </div>
     """, unsafe_allow_html=True)
     
-    # Mostrar módulos en cards
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        <div style="border: 2px solid #667eea; border-radius: 10px; padding: 1.5rem; margin: 1rem 0;">
-            <h3 style="color: #667eea;">🏥 Módulo Médico</h3>
-            <ul style="color: #555;">
-                <li>Registro de lesiones</li>
-                <li>Seguimiento de tratamientos</li>
-                <li>Historial médico completo</li>
-                <li>Planificación de recuperación</li>
-            </ul>
-        </div>
+    with st.form(key='demo_form'):
+        col1, col2 = st.columns(2)
+        with col1:
+            name = st.text_input('Nombre / Club', placeholder="Ej: Club Atlético San Lorenzo")
+            email = st.text_input('Email', placeholder="contacto@tuclub.com")
+        with col2:
+            phone = st.text_input('Teléfono (opcional)', placeholder="(011) 4XXX-XXXX")
+            club_type = st.selectbox('Tipo de Club', ['Rugby', 'Fútbol', 'Hockey', 'Básquet', 'Otro'])
         
-        <div style="border: 2px solid #43e97b; border-radius: 10px; padding: 1.5rem; margin: 1rem 0;">
-            <h3 style="color: #43e97b;">💪 Módulo Físico</h3>
-            <ul style="color: #555;">
-                <li>Tests de fuerza (1RM automático)</li>
-                <li>Evaluaciones de campo</li>
-                <li>Seguimiento de evolución</li>
-                <li>Comparativas por posición</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div style="border: 2px solid #f093fb; border-radius: 10px; padding: 1.5rem; margin: 1rem 0;">
-            <h3 style="color: #f093fb;">🥗 Módulo Nutricional</h3>
-            <ul style="color: #555;">
-                <li>Planes nutricionales personalizados</li>
-                <li>Seguimiento de macronutrientes</li>
-                <li>Objetivos específicos por jugador</li>
-                <li>Análisis de composición corporal</li>
-            </ul>
-        </div>
+        message = st.text_area('Mensaje (qué querés ver en la demo)', placeholder="Contanos qué aspectos te interesan más del sistema...")
         
-        <div style="border: 2px solid #4facfe; border-radius: 10px; padding: 1.5rem; margin: 1rem 0;">
-            <h3 style="color: #4facfe;">🔗 Integración Google Sheets</h3>
-            <ul style="color: #555;">
-                <li>Sincronización automática</li>
-                <li>Trabajo colaborativo</li>
-                <li>Sin cambios en rutinas</li>
-                <li>Backup automático</li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
+        submitted = st.form_submit_button('Enviar solicitud', use_container_width=True)
+        
+        if submitted:
+            if name and email:
+                st.success('🎉 Gracias — tu solicitud fue enviada. Nos comunicamos por email para coordinar la demo.')
+                st.info('📱 También podés contactarnos directamente por WhatsApp: **+54 9 221 357-1957**')
+            else:
+                st.error('Por favor completá al menos el nombre y email')
     
-    # Call to action
+    # Footer con tu información
     st.markdown("""
-    <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); padding: 2rem; border-radius: 15px; margin: 2rem 0; text-align: center; color: white;">
-        <h2 style="margin-bottom: 1rem;">🚀 ¿Listo para digitalizar tu club?</h2>
-        <p style="font-size: 1.2rem; margin-bottom: 1.5rem;">
-            Únete a los clubs que ya están transformando su gestión deportiva
-        </p>
-        <p style="opacity: 0.9;">
-            💼 Implementación completa • 🎓 Capacitación incluida • 📞 Soporte 24/7
-        </p>
+    <div style="color: rgba(255,255,255,0.6); font-size: 13px; padding: 2rem 0; text-align: center; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 2rem;">
+        <p><strong>SRE — Sistema de Rendimiento Élite</strong></p>
+        <p>📧 calvoj550@gmail.com • 📱 +54 9 221 357-1957</p>
+        <p>Desarrollado con ❤️ para la digitalización deportiva • © 2025</p>
     </div>
     """, unsafe_allow_html=True)
+    
+    
 
 def settings_page():
     st.markdown("""

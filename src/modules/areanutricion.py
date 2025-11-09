@@ -1,4 +1,3 @@
-# filepath: c:\Users\dell\Desktop\Car\src\modules\areanutricion.py
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -7,32 +6,56 @@ import os
 from datetime import datetime
 from google.oauth2.service_account import Credentials
 from plotly.subplots import make_subplots
-import gspread  # ← IMPORTANTE: Agregar este import
+import gspread
 import re
-
+import json
 
 def get_google_credentials():
-    # Si estamos en Streamlit Cloud, usamos st.secrets
-    if "google" in st.secrets:
-        return {
-            "type": st.secrets["google"]["type"],
-            "project_id": st.secrets["google"]["project_id"],
-            "private_key_id": st.secrets["google"]["private_key_id"],
-            "private_key": st.secrets["google"]["private_key"],
-            "client_email": st.secrets["google"]["client_email"],
-            "client_id": st.secrets["google"]["client_id"],
-            "auth_uri": st.secrets["google"]["auth_uri"],
-            "token_uri": st.secrets["google"]["token_uri"],
-            "auth_provider_x509_cert_url": st.secrets["google"]["auth_provider_x509_cert_url"],
-            "client_x509_cert_url": st.secrets["google"]["client_x509_cert_url"],
-            "universe_domain": st.secrets["google"].get("universe_domain", "googleapis.com"),
-        }
-    # Si estamos local, leemos el archivo
-    else:
-        cred_path = os.path.join("credentials", "service_account.json")
-        with open(cred_path) as f:
-            return json.load(f)
+    """
+    Obtiene las credenciales de Google de forma segura
+    """
+    try:
+        # Verificar si st.secrets está disponible y tiene datos de Google
+        if hasattr(st, 'secrets') and hasattr(st.secrets, '_file_paths') and st.secrets._file_paths:
+            # Solo verificar si el archivo secrets existe
+            if "google" in st.secrets:
+                return {
+                    "type": st.secrets["google"]["type"],
+                    "project_id": st.secrets["google"]["project_id"],
+                    "private_key_id": st.secrets["google"]["private_key_id"],
+                    "private_key": st.secrets["google"]["private_key"],
+                    "client_email": st.secrets["google"]["client_email"],
+                    "client_id": st.secrets["google"]["client_id"],
+                    "auth_uri": st.secrets["google"]["auth_uri"],
+                    "token_uri": st.secrets["google"]["token_uri"],
+                    "auth_provider_x509_cert_url": st.secrets["google"]["auth_provider_x509_cert_url"],
+                    "client_x509_cert_url": st.secrets["google"]["client_x509_cert_url"],
+                    "universe_domain": st.secrets["google"].get("universe_domain", "googleapis.com"),
+                }
+    except Exception:
+        # Si hay cualquier error con secrets, continuar con archivos locales
+        pass
+    
+    # Si estamos local o no hay secrets, leemos el archivo
+    try:
+        # Buscar el archivo de credenciales en varias ubicaciones
+        possible_paths = [
+            "credentials/service_account.json",
+            "../credentials/service_account.json", 
+            "C:/Users/dell/Desktop/Car/credentials/service_account.json"
+        ]
         
+        for cred_path in possible_paths:
+            if os.path.exists(cred_path):
+                with open(cred_path) as f:
+                    return json.load(f)
+        
+        # Si no encuentra ningún archivo
+        raise FileNotFoundError("No se encontró archivo de credenciales")
+        
+    except Exception as e:
+        st.error(f"❌ Error cargando credenciales: {e}")
+        return None
         
 def read_new_google_sheet_to_df(
     sheet_id='12SqV7eAYpCwePD-TA1R1XOou-nGO3R6QUSHUnxa8tAI',
@@ -42,37 +65,21 @@ def read_new_google_sheet_to_df(
     """
     Lee un Google Sheet específico y devuelve un DataFrame de pandas.
     """
-    import gspread
-    from google.oauth2.service_account import Credentials
-
     SCOPES = [
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive'
     ]
 
     try:
-        # Usar st.secrets si está en Cloud
-        if "google" in st.secrets:
-            creds_info = get_google_credentials()
-            credentials = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
-        else:
-            if credentials_paths is None:
-                credentials_paths = [
-                    "../credentials/service_account.json",
-                    "credentials/service_account.json",
-                    "C:/Users/dell/Desktop/Car/credentials/service_account.json",
-                    "service_account.json"
-                ]
-            credentials_path = None
-            for path in credentials_paths:
-                if os.path.exists(path):
-                    credentials_path = path
-                    break
-            if not credentials_path:
-                st.error(f"❌ Archivo de credenciales no encontrado en las rutas: {credentials_paths}")
-                st.info("🔧 Verifica que el archivo service_account.json esté en una de estas ubicaciones")
-                return None
-            credentials = Credentials.from_service_account_file(credentials_path, scopes=SCOPES)
+        # Obtener credenciales usando la función mejorada
+        creds_info = get_google_credentials()
+        
+        if creds_info is None:
+            st.error("❌ No se pudieron cargar las credenciales de Google")
+            return None
+        
+        # Crear credenciales desde la información obtenida
+        credentials = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
 
         gc = gspread.authorize(credentials)
         sh = gc.open_by_key(sheet_id)
@@ -104,8 +111,11 @@ def read_new_google_sheet_to_df(
 
         return df
 
-    except FileNotFoundError:
-        st.error("❌ Archivo de credenciales no encontrado")
+    except gspread.exceptions.SpreadsheetNotFound:
+        st.error("❌ Google Sheet no encontrado. Verifica el ID y permisos.")
+        return None
+    except gspread.exceptions.APIError as e:
+        st.error(f"❌ Error de API: {e}. Verifica que hayas compartido el sheet con la cuenta de servicio.")
         return None
     except Exception as e:
         st.error(f"❌ Error al conectar con Google Sheets: {str(e)}")
@@ -114,6 +124,8 @@ def read_new_google_sheet_to_df(
         st.info("• El Sheet ID sea correcto")
         st.info("• La cuenta de servicio tenga permisos")
         return None
+
+# ...existing code...
     
     
 def crear_selector_jugadores(df, categorias_seleccionadas):

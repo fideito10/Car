@@ -17,32 +17,53 @@ import json
 import os
 
 def get_google_credentials():
+    """
+    Obtiene las credenciales de Google de forma segura
+    """
+    try:
+        # Verificar si st.secrets está disponible y tiene datos de Google
+        if hasattr(st, 'secrets') and hasattr(st.secrets, '_file_paths') and st.secrets._file_paths:
+            # Solo verificar si el archivo secrets existe
+            if "google" in st.secrets:
+                return {
+                    "type": st.secrets["google"]["type"],
+                    "project_id": st.secrets["google"]["project_id"],
+                    "private_key_id": st.secrets["google"]["private_key_id"],
+                    "private_key": st.secrets["google"]["private_key"],
+                    "client_email": st.secrets["google"]["client_email"],
+                    "client_id": st.secrets["google"]["client_id"],
+                    "auth_uri": st.secrets["google"]["auth_uri"],
+                    "token_uri": st.secrets["google"]["token_uri"],
+                    "auth_provider_x509_cert_url": st.secrets["google"]["auth_provider_x509_cert_url"],
+                    "client_x509_cert_url": st.secrets["google"]["client_x509_cert_url"],
+                    "universe_domain": st.secrets["google"].get("universe_domain", "googleapis.com"),
+                }
+    except Exception:
+        # Si hay cualquier error con secrets, continuar con archivos locales
+        pass
     
-    
-    # Si estamos en Streamlit Cloud, usamos st.secrets
-    if "google" in st.secrets:
-        return {
-            "type": st.secrets["google"]["type"],
-            "project_id": st.secrets["google"]["project_id"],
-            "private_key_id": st.secrets["google"]["private_key_id"],
-            "private_key": st.secrets["google"]["private_key"],
-            "client_email": st.secrets["google"]["client_email"],
-            "client_id": st.secrets["google"]["client_id"],
-            "auth_uri": st.secrets["google"]["auth_uri"],
-            "token_uri": st.secrets["google"]["token_uri"],
-            "auth_provider_x509_cert_url": st.secrets["google"]["auth_provider_x509_cert_url"],
-            "client_x509_cert_url": st.secrets["google"]["client_x509_cert_url"],
-            "universe_domain": st.secrets["google"].get("universe_domain", "googleapis.com"),
-        }
-    # Si estamos local, leemos el archivo
-    else:
-        cred_path = os.path.join("credentials", "service_account.json")
-        with open(cred_path) as f:
-            return json.load(f)
-# Configurar el path para importaciones
-current_dir = os.path.dirname(__file__)
-parent_dir = os.path.dirname(os.path.dirname(current_dir))
-sys.path.append(parent_dir)
+    # Si estamos local o no hay secrets, leemos el archivo
+    try:
+        # Buscar el archivo de credenciales en varias ubicaciones
+        possible_paths = [
+            "credentials/service_account.json",
+            "../credentials/service_account.json", 
+            "credentials/car-digital-441319-1a4e4b5c11c2.json",
+            "../credentials/car-digital-441319-1a4e4b5c11c2.json"
+        ]
+        
+        for cred_path in possible_paths:
+            if os.path.exists(cred_path):
+                with open(cred_path) as f:
+                    return json.load(f)
+        
+        # Si no encuentra ningún archivo
+        raise FileNotFoundError("No se encontró archivo de credenciales")
+        
+    except Exception as e:
+        st.error(f"❌ Error cargando credenciales: {e}")
+        return None
+
 
 # Importaciones opcionales - continuar si no están disponibles
 try:
@@ -59,8 +80,9 @@ import gspread
 from google.oauth2.service_account import Credentials
 from google.oauth2.service_account import Credentials
 
-creds_info = get_google_credentials()
-creds = Credentials.from_service_account_info(creds_info)
+# Inicializar variables globales - se cargarán cuando se necesiten
+creds_info = None
+creds = None
 
 with st.sidebar:
         st.header("🔧 Configuración")
@@ -83,56 +105,43 @@ with st.sidebar:
         st.subheader("📊 Google Sheets")
 
 
+# ...existing code...
+
 def read_google_sheet_with_headers(sheet_id=None, worksheet_name=None, credentials_path=None):
     """
     Lee un Google Sheet usando la primera fila como nombres de columnas
-    
-    Args:
-        sheet_id (str): ID del Google Sheet (opcional, usa el por defecto)
-        worksheet_name (str): Nombre de la hoja específica (opcional, usa la primera)
-        credentials_path (str): Ruta al archivo de credenciales (opcional)
-    
-    Returns:
-        dict: Diccionario con 'success', 'data', 'columns' y 'message'
     """
+    global creds_info, creds
     
     # Configuración por defecto
     if sheet_id is None:
         sheet_id = '1zGyW-M_VV7iyDKVB1TTd0EEP3QBjdoiBmSJN2tK-H7w'
     
-    # --- NUEVO: Obtener credenciales de la forma correcta ---
+    # Cargar credenciales solo cuando se necesiten
+    if creds_info is None:
+        creds_info = get_google_credentials()
+        
+    if creds_info is None:
+        return {
+            'success': False,
+            'data': None,
+            'columns': None,
+            'message': 'No se pudieron cargar las credenciales de Google'
+        }
+    
     try:
         SCOPES = [
             'https://www.googleapis.com/auth/spreadsheets',
             'https://www.googleapis.com/auth/drive'
         ]
-        # Si estamos en Streamlit Cloud (st.secrets), usamos from_service_account_info
-        if "google" in st.secrets:
-            creds_info = get_google_credentials()
-            credentials = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
-        else:
-            # Si estamos local, buscamos el archivo
-            if credentials_path is None:
-                alternative_paths = [
-                    "../credentials/service_account.json",
-                    "credentials/service_account.json",
-                    "C:/Users/dell/Desktop/Car/credentials/service_account.json"
-                ]
-                for path in alternative_paths:
-                    if os.path.exists(path):
-                        credentials_path = path
-                        break
-            if not credentials_path:
-                return {
-                    'success': False,
-                    'data': None,
-                    'columns': None,
-                    'message': 'Archivo de credenciales no encontrado'
-                }
-            credentials = Credentials.from_service_account_file(credentials_path, scopes=SCOPES)
         
-        gc = gspread.authorize(credentials)
+        # Crear credenciales solo cuando se necesiten
+        if creds is None:
+            creds = Credentials.from_service_account_info(creds_info, scopes=SCOPES)
         
+        gc = gspread.authorize(creds)
+        
+      
         # Abrir el Google Sheet
         sh = gc.open_by_key(sheet_id)
         
