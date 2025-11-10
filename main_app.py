@@ -17,6 +17,13 @@ import os
 import sys
 from google.oauth2 import service_account
 
+
+
+# Cargar credenciales desde secrets
+credentials_dict = dict(st.secrets["gcp_service_account"])
+credentials = service_account.Credentials.from_service_account_info(credentials_dict)
+
+
 # Crear la carpeta 'credentials' si no existe
 if not os.path.exists('credentials'):
     os.makedirs('credentials')
