@@ -213,12 +213,12 @@ def load_car_styles():
     
     /* Ocultar elementos de Streamlit */
     .stDeployButton {display: none;}
-    #MainMenu {visibility: hidden;}
+    /* #MainMenu {visibility: hidden;} */        /* ← COMENTADO PARA MOSTRAR MENÚ */
     footer {visibility: hidden;}
-    header {visibility: hidden;}
+    /* header {visibility: hidden;} */           /* ← COMENTADO PARA MOSTRAR HEADER */
     </style>
     """, unsafe_allow_html=True)
-
+    
 class AuthManager:
     def __init__(self, credentials_file='credentials/users_credentials.json'):
         self.credentials_file = credentials_file
