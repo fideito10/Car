@@ -209,6 +209,3 @@ def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
             {'selector': 'table', 'props': [('border-radius', '8px'), ('border', '1px solid #e1e1e1'), ('background-color', '#fff')]}
         ])
     )
-
-    st.markdown("### 📋 Datos filtrados y estilizados:")
-    st.dataframe(styled_df, use_container_width=True)

@@ -12,9 +12,6 @@ from typing import Dict, List, Optional
 import json
 import sys
 import os
-import streamlit as st
-import json
-import os
 
 def get_google_credentials():
     """
@@ -47,48 +44,26 @@ def get_google_credentials():
         st.error(f"❌ Error cargando credenciales: {e}")
         return None
 
-
-# Importaciones opcionales - continuar si no están disponibles
+# Importaciones opcionales
 try:
     from sheets.formularios_google_sheets import FormulariosGoogleSheets
 except ImportError:
     FormulariosGoogleSheets = None
 
 try:
-    from auth_manager import AuthManager
+    from .auth_manager import AuthManager
 except ImportError:
-    AuthManager = None
+    try:
+        from auth_manager import AuthManager
+    except ImportError:
+        AuthManager = None
 
 import gspread
 from google.oauth2.service_account import Credentials
-from google.oauth2.service_account import Credentials
 
-# Inicializar variables globales - se cargarán cuando se necesiten
+# Variables globales
 creds_info = None
 creds = None
-
-with st.sidebar:
-        st.header("🔧 Configuración")
-
-        # --- MENÚ DE NAVEGACIÓN PRINCIPAL ---
-        st.markdown("### 🗂 Navegación")
-        paginas = {
-            "🏠 Dashboard Principal": "dashboard",
-            "🏥 Área Médica": "areamedica",
-            "🥗 Área Nutrición": "nutricion",
-            "🏋️ Área Física": "fisica"
-        }
-        for nombre, clave in paginas.items():
-            if st.button(nombre):
-                st.session_state['pagina'] = clave
-                st.experimental_rerun()
-
-        st.markdown("---")
-        # Configuración de Google Sheets
-        st.subheader("📊 Google Sheets")
-
-
-# ...existing code...
 
 def read_google_sheet_with_headers(sheet_id=None, worksheet_name=None, credentials_path=None):
     """
@@ -124,21 +99,26 @@ def read_google_sheet_with_headers(sheet_id=None, worksheet_name=None, credentia
         
         gc = gspread.authorize(creds)
         
-      
         # Abrir el Google Sheet
         sh = gc.open_by_key(sheet_id)
         
-        # Seleccionar la hoja de trabajo
+        # Seleccionar la hoja de trabajo - MEJORADO
         if worksheet_name:
             worksheet = sh.worksheet(worksheet_name)
         else:
             worksheets = sh.worksheets()
             worksheet = None
+            
+            # Buscar por ID específico
+            target_id = 982269766
             for ws in worksheets:
-                if ws.id == 982269766:
+                if ws.id == target_id:
                     worksheet = ws
                     break
+            
+            # Si no encuentra por ID, usar la primera
             if worksheet is None:
+                # st.warning(f"⚠️ No se encontró worksheet con ID {target_id}, usando la primera hoja")
                 worksheet = sh.get_worksheet(0)
         
         # Leer todos los datos
@@ -154,9 +134,9 @@ def read_google_sheet_with_headers(sheet_id=None, worksheet_name=None, credentia
         
         # Primera fila como columnas
         columns = all_data[0]
-        data_rows = all_data[1:]  # Resto de filas como datos
+        data_rows = all_data[1:]
         
-        # Crear lista de diccionarios (cada fila es un diccionario)
+        # Crear lista de diccionarios
         structured_data = []
         for row in data_rows:
             row_data = {}
@@ -200,13 +180,9 @@ def read_google_sheet_with_headers(sheet_id=None, worksheet_name=None, credentia
             'message': f'Error inesperado: {e}'
         }
 
-
 def create_dataframe_from_sheet(sheet_id=None, worksheet_name=None):
     """
     Crea un DataFrame de pandas desde el Google Sheet
-    
-    Returns:
-        pandas.DataFrame o None si hay error
     """
     result = read_google_sheet_with_headers(sheet_id, worksheet_name)
     
@@ -216,199 +192,10 @@ def create_dataframe_from_sheet(sheet_id=None, worksheet_name=None):
     else:
         return None
 
-# ==========================================
-# INTERFAZ STREAMLIT
-# ==========================================
-
-def main_streamlit():
-    """
-    Interfaz principal de Streamlit para visualizar datos de Google Sheets
-    """
-    st.set_page_config(
-        page_title="CAR - Sistema Digital",
-        page_icon="⚡",
-        layout="wide",
-        initial_sidebar_state="expanded"  # <-- Sidebar visible por defecto
-    )
-
-    # CSS personalizado para el diseño profesional
-    st.markdown("""
-    <style>
-    /* Ocultar elementos de Streamlit */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    
-    /* Estilo del contenedor principal */
-    .main > div {
-        padding-top: 0rem;
-    }
-    
-    /* Header principal con gradiente azul */
-    .header-container {
-        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #60a5fa 100%);
-        padding: 3rem 2rem;
-        margin: -1rem -1rem 2rem -1rem;
-        border-radius: 0 0 20px 20px;
-        text-align: center;
-        box-shadow: 0 8px 32px rgba(30, 58, 138, 0.3);
-    }
-    
-    .header-title {
-        color: white;
-        font-size: 3rem;
-        font-weight: 800;
-        margin: 0;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-    }
-    
-    .header-subtitle {
-        color: #e0f2fe;
-        font-size: 1.2rem;
-        font-weight: 400;
-        margin: 0.5rem 0 0 0;
-        opacity: 0.95;
-    }
-    
-    /* Estilo de las tarjetas métricas */
-    .metric-container {
-        background: linear-gradient(135deg, #1e40af 0%, #2563eb 100%);
-        padding: 2rem 1.5rem;
-        border-radius: 16px;
-        text-align: center;
-        box-shadow: 0 8px 25px rgba(37, 99, 235, 0.25);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        margin: 0.5rem;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-    
-    .metric-container:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 12px 35px rgba(37, 99, 235, 0.4);
-    }
-    
-    .metric-number {
-        color: white;
-        font-size: 3.5rem;
-        font-weight: 800;
-        margin: 0;
-        line-height: 1;
-    }
-    
-    .metric-label {
-        color: #bfdbfe;
-        font-size: 1.1rem;
-        font-weight: 500;
-        margin: 0.5rem 0 0 0;
-    }
-    
-    /* Contenedor de métricas */
-    .metrics-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 1rem;
-        margin: 2rem 0;
-    }
-    
-    /* Estilo para gráficos */
-    .chart-container {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-        margin: 1rem 0;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # Header principal con diseño profesional
-    st.markdown("""
-    <div class="header-container">
-        <h1 class="header-title">⚡ Sistema digital CAR</h1>
-        <p class="header-subtitle">Sistema Integral de Gestión Deportiva Profesional</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # Sidebar con configuración
-    with st.sidebar:
-        st.header("🔧 Configuración")
-        
-        # Configuración de Google Sheets
-        st.subheader("📊 Google Sheets")
-        
-        sheet_id = st.text_input(
-            "ID del Google Sheet:",
-            value="1zGyW-M_VV7iyDKVB1TTd0EEP3QBjdoiBmSJN2tK-H7w",
-            help="ID del Google Sheet que contiene los datos médicos"
-        )
-        
-        worksheet_name = st.text_input(
-            "Nombre de la hoja (opcional):",
-            value="",
-            help="Deja vacío para usar la hoja principal"
-        )
-        
-        st.markdown("---")
-        
-        # Estado del sistema
-        st.subheader("📋 Estado del Sistema")
-        
-        # Verificar credenciales
-        credenciales_encontradas = False
-        rutas_credenciales = [
-            "../credentials/service_account.json",
-            "credentials/service_account.json",
-            "C:/Users/dell/Desktop/Car/credentials/service_account.json"
-        ]
-        
-        for ruta in rutas_credenciales:
-            if os.path.exists(ruta):
-                st.success(f"✅ Credenciales: {ruta}")
-                credenciales_encontradas = True
-                break
-        
-        if not credenciales_encontradas:
-            st.error("❌ Credenciales no encontradas")
-            st.info("💡 Asegúrate de tener el archivo service_account.json en la carpeta credentials")
-
-    # CARGAR DATOS AUTOMÁTICAMENTE (sin botón)
-    with st.spinner("🔄 Cargando datos desde Google Sheets..."):
-        try:
-            # Llamar a la función existente
-            result = read_google_sheet_with_headers(sheet_id, worksheet_name or None)
-            
-            if result['success']:
-                
-                
-                # Crear DataFrame
-                df = pd.DataFrame(result['data'])
-                
-                # MOSTRAR DIRECTAMENTE EL RESUMEN (sin pestañas)
-                mostrar_resumen_datos(df)
-                
-                # MOSTRAR GRÁFICOS INTERACTIVOS
-                mostrar_graficos_interactivos(df)
-            else:
-                st.error(f"❌ Error al cargar datos: {result['message']}")
-                
-                # Mostrar información de ayuda
-                with st.expander("💡 Solución de Problemas", expanded=True):
-                    st.markdown("""
-                    **Posibles soluciones:**
-                    1. Verifica que el archivo `service_account.json` esté en la carpeta `credentials`
-                    2. Asegúrate de que el Google Sheet sea accesible
-                    3. Verifica que la cuenta de servicio tenga permisos de lectura
-                    4. Confirma que el ID del Sheet sea correcto
-                    """)
-                
-        except Exception as e:
-            st.error(f"❌ Error inesperado: {str(e)}")
-
 def mostrar_resumen_datos(df):
     """
-    Muestra resumen estadístico de los datos con tarjetas métricas estilo profesional
+    Muestra resumen estadístico de los datos con tarjetas métricas
     """
-    
     # Calcular métricas
     total_lesionados = len(df)
     
@@ -421,272 +208,447 @@ def mostrar_resumen_datos(df):
         recuperados = 0
         casos_graves = 0
     
-    # Tarjetas métricas con diseño profesional
-    st.markdown("""
-    <div class="metrics-grid">
-        <div class="metric-container">
-            <div class="metric-number">{}</div>
-            <div class="metric-label">Lesiones totales</div>
-        </div>
-        <div class="metric-container">
-            <div class="metric-number">{}</div>
-            <div class="metric-label">En Recuperación</div>
-        </div>
-        <div class="metric-container">
-            <div class="metric-number">{}</div>
-            <div class="metric-label">Recuperados</div>
-        </div>
-        <div class="metric-container">
-            <div class="metric-number">{}</div>
-            <div class="metric-label">Casos Graves</div>
-        </div>
-    </div>
-    """.format(total_lesionados, en_recuperacion, recuperados, casos_graves), unsafe_allow_html=True)
+    # Tarjetas métricas
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("📋 Lesiones Totales", total_lesionados)
+    with col2:
+        st.metric("🔄 En Recuperación", en_recuperacion)
+    with col3:
+        st.metric("✅ Recuperados", recuperados)
+    with col4:
+        st.metric("⚠️ Casos Graves", casos_graves)
+
+def mostrar_filtros_jugador_categoria(df):
+    """
+    Muestra filtros por categoría y jugador con información detallada
+    """
+    st.markdown("### 🔍 Filtros por Categoría y Jugador")
     
-    st.markdown("---")
+    # Nombres de columnas
+    col_categoria = 'Categoría'
+    col_jugador = 'Nombre del Paciente'
     
-    # Gráficos con diseño profesional
-    if 'Severidad de la lesión' in df.columns:
-        severidad_counts = df['Severidad de la lesión '].value_counts()
+    # Filtros en columnas
+    col_filtro1, col_filtro2 = st.columns(2)
+    
+    with col_filtro1:
+        # FILTRO IZQUIERDO - CATEGORÍAS
+        if col_categoria in df.columns:
+            categorias_disponibles = ['Todas'] + sorted(df[col_categoria].dropna().unique().tolist())
+            categoria_seleccionada = st.selectbox(
+                "🏈 Seleccionar División",
+                categorias_disponibles,
+                key="area_medica_filtro_categoria"
+            )
+        else:
+            categoria_seleccionada = 'Todas'
+    
+    with col_filtro2:
+        # FILTRO DERECHO - JUGADORES (FILTRADOS POR CATEGORÍA)
+        if col_jugador in df.columns:
+            # AQUÍ ESTÁ LA MAGIA: Si hay categoría seleccionada, filtra los jugadores
+            if categoria_seleccionada != 'Todas':
+                jugadores_filtrados = df[df[col_categoria] == categoria_seleccionada][col_jugador].dropna().unique()
+            else:
+                jugadores_filtrados = df[col_jugador].dropna().unique()
+            
+            jugadores_disponibles = ['Todos'] + sorted(jugadores_filtrados.tolist())
+            jugador_seleccionado = st.selectbox(
+                "👤 Seleccionar Jugador",
+                jugadores_disponibles,
+                key="area_medica_filtro_jugador"
+            )
+        else:
+            jugador_seleccionado = 'Todos'
+    
+    # Aplicar filtros al DataFrame
+    df_filtrado = df.copy()
+    
+    # Aplicar filtro de categoría
+    if categoria_seleccionada != 'Todas' and col_categoria in df.columns:
+        df_filtrado = df_filtrado[df_filtrado[col_categoria] == categoria_seleccionada]
+    
+    # Aplicar filtro de jugador específico
+    if jugador_seleccionado != 'Todos' and col_jugador in df.columns:
+        df_filtrado = df_filtrado[df_filtrado[col_jugador] == jugador_seleccionado]
+    
+    # Mostrar información de filtros aplicados
+    info_filtros = []
+    if categoria_seleccionada != 'Todas':
+        info_filtros.append(f"**División:** {categoria_seleccionada}")
+    if jugador_seleccionado != 'Todos':
+        info_filtros.append(f"**Jugador:** {jugador_seleccionado}")
+    
+    if info_filtros:
+        st.info(f"🔍 **Filtros activos:** {' | '.join(info_filtros)}")
+    
+    # Mostrar resultados filtrados
+    if not df_filtrado.empty:
+        st.success(f"✅ **{len(df_filtrado)} registro(s) encontrado(s)**")
         
-        # Contenedor para gráficos
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        # Si es un jugador específico, mostrar información detallada
+        if jugador_seleccionado != 'Todos':
+            st.markdown(f"#### 👤 Historial Médico de {jugador_seleccionado}")
+            
+            # Mostrar resumen del jugador
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("📋 Total Lesiones", len(df_filtrado))
+            with col2:
+                if 'Severidad de la lesión' in df_filtrado.columns:
+                    graves = len(df_filtrado[df_filtrado['Severidad de la lesión'].str.contains('Grave', case=False, na=False)])
+                    st.metric("⚠️ Lesiones Graves", graves)
+                else:
+                    st.metric("⚠️ Lesiones Graves", "N/A")
+            with col3:
+                if 'Fecha' in df_filtrado.columns:
+                    try:
+                        fechas = pd.to_datetime(df_filtrado['Fecha'], errors='coerce').dropna()
+                        if not fechas.empty:
+                            ultima_lesion = fechas.max().strftime('%d/%m/%Y')
+                            st.metric("📅 Última Lesión", ultima_lesion)
+                        else:
+                            st.metric("📅 Última Lesión", "N/A")
+                    except:
+                        st.metric("📅 Última Lesión", "N/A")
         
+        # Mostrar tabla de datos
+        st.dataframe(df_filtrado, use_container_width=True, height=400)
+        
+        # Botón para descargar datos filtrados
+        if len(df_filtrado) > 0:
+            csv = df_filtrado.to_csv(index=False)
+            st.download_button(
+                label="📥 Descargar datos filtrados",
+                data=csv,
+                file_name=f"lesiones_filtradas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+    else:
+        st.warning("⚠️ No se encontraron registros con los filtros seleccionados")
+    
+    # Devolver el DataFrame filtrado para uso en otras funciones
+    return df_filtrado
+
+def test_google_connection():
+    """
+    Prueba la conexión con Google Sheets y muestra información de diagnóstico
+    """
+    st.sidebar.markdown("### 🧪 Test de Conexión")
+    
+    if st.sidebar.button("🔗 Probar Conexión"):
+        with st.sidebar.spinner("Probando conexión..."):
+            # Test básico de credenciales
+            creds = get_google_credentials()
+            if creds is None:
+                st.sidebar.error("❌ No se encontraron credenciales")
+                return
+            
+            st.sidebar.success("✅ Credenciales cargadas")
+            
+            # Test de conexión al sheet
+            result = read_google_sheet_with_headers()
+            
+            if result['success']:
+                st.sidebar.success(f"✅ Conexión exitosa")
+                st.sidebar.info(f"📊 {result['total_rows']} filas, {len(result['columns'])} columnas")
+                
+                with st.sidebar.expander("Ver detalles"):
+                    st.write("**Información del Sheet:**")
+                    st.write(f"- Título: {result.get('sheet_title', 'N/A')}")
+                    st.write(f"- Hoja: {result.get('worksheet_title', 'N/A')}")
+                    st.write(f"- Mensaje: {result['message']}")
+                    
+                    st.write("**Columnas encontradas:**")
+                    for i, col in enumerate(result['columns']):
+                        st.write(f"{i+1}. `{col}`")
+            else:
+                st.sidebar.error(f"❌ Error: {result['message']}")
+
+def mostrar_graficos_interactivos(df):
+    """
+    Muestra gráficos interactivos con filtros
+    """
+    st.markdown("### 📊 Análisis de Lesiones")
+    
+    # Nombres de columnas
+    col_categoria = 'Categoría'
+    col_severidad = 'Severidad de la lesión'
+    
+    # Limpiar datos
+    if col_severidad in df.columns:
+        df[col_severidad] = df[col_severidad].str.strip()
+    
+    # Gráficos
+    if col_categoria in df.columns and not df.empty:
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("### 📊 Distribución por Severidad")
-            # Gráfico de barras con colores azules
+            st.markdown("#### 📊 Lesiones por División")
+            categorias_counts = df[col_categoria].value_counts()
+            
             fig = px.bar(
-                x=severidad_counts.index,
-                y=severidad_counts.values,
-                color_discrete_sequence=['#1e40af', '#2563eb', '#3b82f6', '#60a5fa']
+                x=categorias_counts.index,
+                y=categorias_counts.values,
+                color_discrete_sequence=['#1e40af', '#2563eb', '#3b82f6']
             )
             
             fig.update_layout(
                 showlegend=False,
-                xaxis_title="Severidad de la Lesión",
-                yaxis_title="Cantidad de Jugadores",
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#374151')
+                xaxis_title="División",
+                yaxis_title="Cantidad",
+                height=400
             )
             
             st.plotly_chart(fig, use_container_width=True)
         
         with col2:
-            st.markdown("### 📈 Análisis Porcentual")
-            # Gráfico de dona con colores azules
-            fig_pie = px.pie(
-                values=severidad_counts.values,
-                names=severidad_counts.index,
-                hole=0.4,
-                color_discrete_sequence=['#1e40af', '#2563eb', '#3b82f6', '#60a5fa']
-            )
-            
-            fig_pie.update_layout(
-                showlegend=True,
-                legend=dict(orientation="v", yanchor="middle", y=0.5),
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#374151')
-            )
-            
-            st.plotly_chart(fig_pie, use_container_width=True)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
+            if col_severidad in df.columns:
+                st.markdown("#### 🎯 Distribución por Severidad")
+                severidad_counts = df[col_severidad].value_counts()
+                
+                fig_pie = px.pie(
+                    values=severidad_counts.values,
+                    names=severidad_counts.index,
+                    color_discrete_sequence=['#22c55e', '#eab308', '#ef4444', '#dc2626']
+                )
+                
+                fig_pie.update_layout(height=400)
+                st.plotly_chart(fig_pie, use_container_width=True)
 
 
-def mostrar_graficos_interactivos(df):
+# Agregar después de la función mostrar_graficos_interactivos:
+
+def mostrar_timeline_lesiones(df):
     """
-    Muestra gráficos interactivos con filtros - VERSIÓN CORREGIDA
+    Muestra timeline de lesiones por fecha
     """
-    st.markdown("---")
-    st.markdown("### 📊 Informe de Lesiones por División")
-    
-    # NOMBRES CORRECTOS DE LAS COLUMNAS
-    col_categoria = 'Categoría'  # ← CON TILDE
-    col_severidad = 'Severidad de la lesión  '  # ← CON ESPACIOS EXTRA
-    
-    # Limpiar datos si es necesario
-    if col_severidad in df.columns:
-        df[col_severidad] = df[col_severidad].str.strip()  # Quitar espacios extra
-    
-    # Filtros interactivos
-    col_filtro1, col_filtro2 = st.columns(2)
-    
-    with col_filtro1:
-        # Filtro por División/Categorías
-        if col_categoria in df.columns:
-            categorias_disponibles = ['Todas'] + sorted(df[col_categoria].dropna().unique().tolist())
-            categoria_seleccionada = st.selectbox(
-                "🔍 Seleccionar División",
-                categorias_disponibles,
-                key="filtro_categoria"
-            )
-        else:
-            categoria_seleccionada = 'Todas'
-            st.info(f"⚠️ Columna '{col_categoria}' no encontrada")
-    
-    with col_filtro2:
-        # Filtro por Estado/Severidad
-        if col_severidad in df.columns:
-            estados_disponibles = ['Todos'] + sorted(df[col_severidad].dropna().unique().tolist())
-            estado_seleccionado = st.selectbox(
-                "📋 Estado",
-                estados_disponibles,
-                key="filtro_estado"
-            )
-        else:
-            estado_seleccionado = 'Todos'
-            st.info(f"⚠️ Columna '{col_severidad}' no encontrada")
+    if 'Fecha' in df.columns and not df.empty:
+        st.markdown("#### 📅 Timeline de Lesiones")
         
-    # Filtrar DataFrame según selecciones
-    df_filtrado = df.copy()
-    
-    if categoria_seleccionada != 'Todas' and col_categoria in df.columns:
-        df_filtrado = df_filtrado[df_filtrado[col_categoria] == categoria_seleccionada]
-    
-    if estado_seleccionado != 'Todos' and col_severidad in df.columns:
-        df_filtrado = df_filtrado[df_filtrado[col_severidad] == estado_seleccionado]
-    
-    # Gráficos lado a lado
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("#### 📊 Lesiones por División")
+        # Convertir fechas
+        df_timeline = df.copy()
+        df_timeline['Fecha'] = pd.to_datetime(df_timeline['Fecha'], errors='coerce')
+        df_timeline = df_timeline.dropna(subset=['Fecha'])
         
-        if col_categoria in df_filtrado.columns and not df_filtrado.empty:
-            # Contar lesiones por categoría
-            categorias_counts = df_filtrado['Categoría'].value_counts()
+        if not df_timeline.empty:
+            # Agrupar por fecha
+            lesiones_por_fecha = df_timeline.groupby(df_timeline['Fecha'].dt.date).size().reset_index()
+            lesiones_por_fecha.columns = ['Fecha', 'Cantidad']
             
-            # Gráfico de barras con colores azules oscuros (como en la imagen)
-            fig_categorias = px.bar(
-                x=categorias_counts.index,
-                y=categorias_counts.values,
-                color_discrete_sequence=['#1e3a8a', '#1e40af', '#2563eb', '#3b82f6']
+            fig = px.line(
+                lesiones_por_fecha, 
+                x='Fecha', 
+                y='Cantidad',
+                title="Evolución Temporal de Lesiones",
+                markers=True
             )
             
-            fig_categorias.update_layout(
-                showlegend=False,
-                xaxis_title="División",
-                yaxis_title="Cantidad de Lesiones",
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#374151', size=12),
-                height=400,
-                margin=dict(t=20, b=20, l=20, r=20)
-            )
-            
-            fig_categorias.update_traces(
-                texttemplate='%{y}',
-                textposition='outside'
-            )
-            
-            st.plotly_chart(fig_categorias, use_container_width=True)
-            
-            # Mostrar estadísticas
-            st.info(f"📈 Total de divisiones: {len(categorias_counts)} | Registros mostrados: {len(df_filtrado)}")
-            
-        else:
-            st.warning("⚠️ No hay datos de categorías para mostrar")
-    
-    with col2:
-        st.markdown("#### 🎯 Distribución por Severidad")
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True)
+
+def mostrar_estadisticas_avanzadas(df):
+    """
+    Estadísticas avanzadas y alertas
+    """
+    if not df.empty:
+        st.markdown("#### 🚨 Alertas y Estadísticas")
         
-        if col_severidad in df_filtrado.columns and not df_filtrado.empty:
-            # Contar por severidad
-            severidad_counts = df_filtrado[col_severidad].value_counts()
-            
-            # Gráfico de torta con colores como en la imagen (verde, amarillo, rojo)
-            colores_severidad = {
-                'Leve (1-7 días)': '#22c55e',      # Verde
-                'Moderada (1-4 semanas)': '#eab308', # Amarillo
-                'Grave (1-3 meses)': "#df6767",     # Rojo
-                'Muy grave (+3 meses)': '#dc2626'   # Rojo oscuro
-            }
-            
-            # Crear lista de colores basada en los datos
-            colores = [colores_severidad.get(sev, '#64748b') for sev in severidad_counts.index]
-            
-            fig_severidad = px.pie(
-                values=severidad_counts.values,
-                names=severidad_counts.index,
-                color_discrete_sequence=colores
-            )
-            
-            fig_severidad.update_layout(
-                showlegend=True,
-                legend=dict(
-                    orientation="v",
-                    yanchor="middle",
-                    y=0.5,
-                    xanchor="left",
-                    x=1.05
-                ),
-                plot_bgcolor='rgba(0,0,0,0)',
-                paper_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#374151', size=12),
-                height=400,
-                margin=dict(t=20, b=20, l=20, r=80)
-            )
-            
-            fig_severidad.update_traces(
-                textposition='inside',
-                textinfo='percent+label',
-                textfont_size=12
-            )
-            
-            st.plotly_chart(fig_severidad, use_container_width=True)
-            
-            # Mostrar estadísticas
-            st.info(f"📊 Tipos de severidad: {len(severidad_counts)} | Total lesiones: {severidad_counts.sum()}")
-            
-        else:
-            st.warning("⚠️ No hay datos de severidad para mostrar")
-    
-    # Tabla resumen de datos filtrados
-    if not df_filtrado.empty:
-        st.markdown("---")
-        st.markdown("#### 📋 Vista Detallada de Datos Filtrados")
+        col1, col2 = st.columns(2)
         
-        # Información de filtros aplicados
-        filtros_aplicados = []
-        if categoria_seleccionada != 'Todas':
-            filtros_aplicados.append(f"División: {categoria_seleccionada}")
-        if estado_seleccionado != 'Todos':
-            filtros_aplicados.append(f"Estado: {estado_seleccionado}")
+        with col1:
+            # Jugadores con más lesiones
+            if 'Nombre del Paciente' in df.columns:
+                jugadores_frecuentes = df['Nombre del Paciente'].value_counts().head(5)
+                
+                if len(jugadores_frecuentes) > 0:
+                    st.warning("⚠️ **Jugadores con más lesiones:**")
+                    for jugador, cantidad in jugadores_frecuentes.items():
+                        if cantidad > 2:  # Alerta si tiene más de 2 lesiones
+                            st.write(f"🔴 {jugador}: {cantidad} lesiones")
+                        else:
+                            st.write(f"🟡 {jugador}: {cantidad} lesiones")
         
-        if filtros_aplicados:
-            st.info(f"🔍 Filtros aplicados: {' | '.join(filtros_aplicados)}")
-        
-        # Mostrar tabla con scroll
-        st.dataframe(
-            df_filtrado,
-            use_container_width=True,
-            height=300
-        )
-        
-        # Botón de descarga
-        csv_data = df_filtrado.to_csv(index=False)
-        st.download_button(
-            label="📥 Descargar Datos Filtrados",
-            data=csv_data,
-            file_name=f"lesiones_filtradas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-            mime="text/csv"
-        )
-    else:
-        st.warning("⚠️ No hay datos que coincidan con los filtros seleccionados")
+        with col2:
+            # Divisiones más afectadas
+            if 'Categoría' in df.columns:
+                divisiones_afectadas = df['Categoría'].value_counts()
+                
+                st.info("📊 **Divisiones más afectadas:**")
+                for division, cantidad in divisiones_afectadas.items():
+                    porcentaje = (cantidad / len(df)) * 100
+                    st.write(f"🏈 {division}: {cantidad} ({porcentaje:.1f}%)")
 
 
-
-
+def main_streamlit():
+    """
+    INTERFAZ PRINCIPAL - ÚNICA FUNCIÓN MAIN
+    """
+    # Header
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 2rem; border-radius: 15px; margin-bottom: 2rem;">
+        <h1 style="color: white; text-align: center; margin: 0;">🏥 Área Médica CAR</h1>
+        <p style="color: rgba(255,255,255,0.9); text-align: center; margin: 0.5rem 0 0 0;">Sistema Integral de Gestión Médica</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-   
-# ==========================================
-# EJECUTAR APLICACIÓN
-# ==========================================
+    # Cargar datos
+    with st.spinner("🔄 Cargando datos desde Google Sheets..."):
+        try:
+            df = create_dataframe_from_sheet()
+            
+            if df is not None and not df.empty:
+                # Nombres de columnas
+                col_categoria = 'Categoría'
+                col_severidad = 'Severidad de la lesión'
+                
+                # FILTROS EN FILA HORIZONTAL
+                st.markdown("### 🔍 Filtros")
+                col_filtro1, col_filtro2 = st.columns(2)
+                
+                with col_filtro1:
+                    # Filtro de Categoría
+                    if col_categoria in df.columns:
+                        categorias_disponibles = ['Todas'] + sorted(df[col_categoria].dropna().unique().tolist())
+                        categoria_seleccionada = st.selectbox(
+                            "🏈 Seleccionar División",
+                            categorias_disponibles,
+                            key="area_medica_filtro_categoria"
+                        )
+                    else:
+                        categoria_seleccionada = 'Todas'
+                
+                with col_filtro2:
+                    # Filtro de Gravedad
+                    if col_severidad in df.columns:
+                        gravedades_disponibles = ['Todas'] + sorted(df[col_severidad].dropna().unique().tolist())
+                        gravedad_seleccionada = st.selectbox(
+                            "⚠️ Seleccionar Gravedad",
+                            gravedades_disponibles,
+                            key="area_medica_filtro_gravedad"
+                        )
+                    else:
+                        gravedad_seleccionada = 'Todas'
+                
+                # Aplicar filtros al DataFrame
+                df_filtrado = df.copy()
+                
+                if categoria_seleccionada != 'Todas' and col_categoria in df.columns:
+                    df_filtrado = df_filtrado[df_filtrado[col_categoria] == categoria_seleccionada]
+                
+                if gravedad_seleccionada != 'Todas' and col_severidad in df.columns:
+                    df_filtrado = df_filtrado[df_filtrado[col_severidad] == gravedad_seleccionada]
+                
+                # Mostrar información de filtros aplicados
+                info_filtros = []
+                if categoria_seleccionada != 'Todas':
+                    info_filtros.append(f"**División:** {categoria_seleccionada}")
+                if gravedad_seleccionada != 'Todas':
+                    info_filtros.append(f"**Gravedad:** {gravedad_seleccionada}")
+                
+                if info_filtros:
+                    st.info(f"🔍 **Filtros activos:** {' | '.join(info_filtros)}")
+                
+                st.markdown("---")
+                
+                # GRÁFICOS EN FILA HORIZONTAL
+                st.markdown("### 📊 Análisis de Lesiones")
+                col_grafico1, col_grafico2 = st.columns(2)
+                
+                with col_grafico1:
+                    # Gráfico por Categoría
+                    st.markdown("#### 📊 Lesiones por División")
+                    if col_categoria in df_filtrado.columns and not df_filtrado.empty:
+                        categorias_counts = df_filtrado[col_categoria].value_counts()
+                        
+                        fig_bar = px.bar(
+                            x=categorias_counts.index,
+                            y=categorias_counts.values,
+                            color_discrete_sequence=['#1e40af', '#2563eb', '#3b82f6', '#60a5fa']
+                        )
+                        
+                        fig_bar.update_layout(
+                            showlegend=False,
+                            xaxis_title="División",
+                            yaxis_title="Cantidad",
+                            height=400
+                        )
+                        
+                        st.plotly_chart(fig_bar, use_container_width=True)
+                    else:
+                        st.info("No hay datos para mostrar")
+                
+                with col_grafico2:
+                    # Gráfico de Torta por Gravedad
+                    st.markdown("#### 🎯 Jugadores por Gravedad")
+                    if col_severidad in df_filtrado.columns and not df_filtrado.empty:
+                        severidad_counts = df_filtrado[col_severidad].value_counts()
+                        
+                        fig_pie = px.pie(
+                            values=severidad_counts.values,
+                            names=severidad_counts.index,
+                            color_discrete_sequence=['#22c55e', '#eab308', '#ef4444', '#dc2626']
+                        )
+                        
+                        fig_pie.update_layout(height=400)
+                        st.plotly_chart(fig_pie, use_container_width=True)
+                    else:
+                        st.info("No hay datos para mostrar")
+                
+                st.markdown("---")
+                
+                # TABLA DE LESIONADOS
+                st.markdown("### 👥 Lesionados")
+                
+                if not df_filtrado.empty:
+                    st.success(f"✅ **{len(df_filtrado)} lesionado(s) encontrado(s)**")
+                    
+                    # Mostrar métricas resumidas
+                    col_met1, col_met2, col_met3, col_met4 = st.columns(4)
+                    with col_met1:
+                        st.metric("📋 Total Lesiones", len(df_filtrado))
+                    with col_met2:
+                        if col_severidad in df_filtrado.columns:
+                            leves = len(df_filtrado[df_filtrado[col_severidad].str.contains('Leve', case=False, na=False)])
+                            st.metric("🟢 Leves", leves)
+                        else:
+                            st.metric("🟢 Leves", "N/A")
+                    with col_met3:
+                        if col_severidad in df_filtrado.columns:
+                            moderadas = len(df_filtrado[df_filtrado[col_severidad].str.contains('Moderada', case=False, na=False)])
+                            st.metric("🟡 Moderadas", moderadas)
+                        else:
+                            st.metric("🟡 Moderadas", "N/A")
+                    with col_met4:
+                        if col_severidad in df_filtrado.columns:
+                            graves = len(df_filtrado[df_filtrado[col_severidad].str.contains('Grave', case=False, na=False)])
+                            st.metric("🔴 Graves", graves)
+                        else:
+                            st.metric("🔴 Graves", "N/A")
+                    
+                    # Tabla de datos
+                    st.dataframe(df_filtrado, use_container_width=True, height=400)
+                    
+                    # Botón para descargar
+                    csv = df_filtrado.to_csv(index=False)
+                    st.download_button(
+                        label="📥 Descargar datos filtrados",
+                        data=csv,
+                        file_name=f"lesiones_filtradas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv"
+                    )
+                else:
+                    st.warning("⚠️ No se encontraron registros con los filtros seleccionados")
+                
+            else:
+                st.error("❌ No se pudieron cargar los datos")
+                
+        except Exception as e:
+            st.error(f"❌ Error: {str(e)}")
 
+
+# Ejecutar solo si es llamado directamente
 if __name__ == "__main__":
-    # Si se ejecuta directamente, iniciar Streamlit
     main_streamlit()
+    

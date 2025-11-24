@@ -2,32 +2,40 @@
 Sistema Principal del Club Argentino de Rugby (CAR)
 Centralizacion de Módulos: Área Médica, Nutrición y Física
 Desarrollado con Streamlit
-Fecha: Octubre 2025
 """
-
 import streamlit as st
+import os
+import sys
 import json
 import hashlib
 from datetime import datetime, date, timedelta
-import pandas as pd
 from typing import Dict, List
-import plotly.express as px
-import plotly.graph_objects as go
-import os
-import sys
 from google.oauth2 import service_account
 
 
-
-# Cargar credenciales desde secrets
-credentials_dict = dict(st.secrets["gcp_service_account"])
-credentials = service_account.Credentials.from_service_account_info(credentials_dict)
+# Configuración de credenciales - Manejo de entornos local y producción
+credentials = None
+try:
+    # Intentar cargar desde Streamlit Cloud (producción)
+    if hasattr(st, 'secrets') and "gcp_service_account" in st.secrets:
+        credentials_dict = dict(st.secrets["gcp_service_account"])
+        credentials = service_account.Credentials.from_service_account_info(credentials_dict)
+        # st.success("✅ Credenciales cargadas desde Streamlit Cloud")  ← COMENTAR O ELIMINAR ESTA LÍNEA
+        credentials_file = 'credentials/service-account-key.json'
+        if os.path.exists(credentials_file):
+            credentials = service_account.Credentials.from_service_account_file(credentials_file)
+            # st.info("📁 Credenciales cargadas desde archivo local")  ← ESTAS LÍNEAS YA ESTÁN COMENTADAS ✅
+        else:
+            # Sin credenciales - modo desarrollo
+            credentials = None
+            # st.warning("⚠️ Ejecutando en modo desarrollo. Funcionalidades de Google Sheets no disponibles.")  ← ESTAS TAMBIÉN ✅
+except Exception as e:
+    credentials = None
 
 
 # Crear la carpeta 'credentials' si no existe
 if not os.path.exists('credentials'):
     os.makedirs('credentials')
-
 
 
 # Agregar carpetas al path de Python
@@ -83,17 +91,49 @@ try:
 except ImportError:
     dashboard_360 = None
     dashboard_360_available = False
+    
+# Importar módulo de Reportes Médicos
+try:
+    from src.modules.reportemedico import main_reporte_medico
+    reportes_medicos_available = True
+except ImportError:
+    main_reporte_medico = None
+    reportes_medicos_available = False
+    
+# Importar módulo de Administración (corregir importación)
+try:
+    from src.modules.administracion import main_administracion
+    administracion_available = True
+except ImportError as e:
+    main_administracion = None
+    administracion_available = False
+    print(f"Error importando administracion: {e}")  
+
 
 
 
 def get_gcp_credentials():
-    """Obtener credenciales de Google Cloud desde Streamlit secrets"""
+    """Obtener credenciales de Google Cloud desde Streamlit secrets o archivo local"""
     try:
-        gcp_service_account = st.secrets["gcp_service_account"]
-        credentials = service_account.Credentials.from_service_account_info(gcp_service_account)
-        return credentials
+        # Si ya tenemos credenciales globales, usarlas
+        if 'credentials' in globals() and credentials is not None:
+            return credentials
+            
+        # Intentar cargar desde Streamlit Cloud
+        if hasattr(st, 'secrets') and "gcp_service_account" in st.secrets:
+            credentials_dict = dict(st.secrets["gcp_service_account"])
+            return service_account.Credentials.from_service_account_info(credentials_dict)
+        
+        # Para desarrollo local
+        credentials_file = 'credentials/service-account-key.json'
+        if os.path.exists(credentials_file):
+            return service_account.Credentials.from_service_account_file(credentials_file)
+        
+        # Sin credenciales disponibles
+        return None
+        
     except Exception as e:
-        st.error(f"Error al cargar credenciales: {e}")
+        st.error(f"Error al obtener credenciales: {str(e)}")
         return None
 
 def load_json_data(filename, default_data=None):
@@ -108,7 +148,7 @@ def load_json_data(filename, default_data=None):
 # Configuración de la página
 st.set_page_config(
     page_title="Club Argentino de Rugby - Sistema de Gestión",
-    page_icon="🏉",
+    page_icon="car.jpg",  # También funciona con car.ico
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -642,6 +682,9 @@ def show_basic_medical_system():
         """, unsafe_allow_html=True)
 
 
+
+# ...existing code...
+
 def main_dashboard():
     load_car_styles()
     
@@ -656,90 +699,116 @@ def main_dashboard():
     </div>
     """, unsafe_allow_html=True)
     
-    # Menú de navegación
-    menu_options = {
-        "🏠 Portada": "dashboard",
-        "📊 Panel del Jugador": "dashboard_360",
-        "🏥 Área Médica": "medical",
-        "🥗 Área Nutrición": "nutricion",
-        "🏋️ Área Física": "physical",
-        "⚙️ Configuración": "settings"
-    }
+    st.sidebar.markdown("### 🧭 Menú Principal")
     
-    if 'current_page' not in st.session_state:
+    # Botones individuales en el sidebar (como estaba antes)
+    if st.sidebar.button("🏠 Portada", use_container_width=True):
         st.session_state.current_page = "dashboard"
-    
-    st.sidebar.markdown("### 📋 Menú Principal")
-    
-    for option_name, option_key in menu_options.items():
-        button_style = "🔹" if st.session_state.current_page == option_key else ""
-        if st.sidebar.button(f"{button_style} {option_name}", use_container_width=True):
-            st.session_state.current_page = option_key
-            st.rerun()
-    
-    st.sidebar.markdown("---")
-    
-    if st.sidebar.button("🚪 Cerrar Sesión", use_container_width=True):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
         st.rerun()
     
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("**📞 Contacto CAR:**")
-    st.sidebar.markdown("📧 calvoj550@mail.com")
-    st.sidebar.markdown("📱 (2213571957)")
-
-    # ✅ NAVEGACIÓN CORREGIDA
+    if st.sidebar.button("📊 Panel del Jugador", use_container_width=True):
+        st.session_state.current_page = "dashboard_360"
+        st.rerun()
+    
+    if st.sidebar.button("🏥 Área Médica", use_container_width=True):
+        st.session_state.current_page = "medical"
+        st.rerun()
+    
+    if st.sidebar.button("📄 Reportes Médicos", use_container_width=True):
+        st.session_state.current_page = "medical_reports"
+        st.rerun()
+    
+    if st.sidebar.button("🥗 Área Nutrición", use_container_width=True):
+        st.session_state.current_page = "nutricion"
+        st.rerun()
+    
+    if st.sidebar.button("🏋️ Área Física", use_container_width=True):
+        st.session_state.current_page = "physical"
+        st.rerun()
+    
+    if st.sidebar.button("📋 Administración", use_container_width=True):
+        st.session_state.current_page = "administracion"
+        st.rerun()
+    
+    if st.sidebar.button("⚙️ Configuración", use_container_width=True):
+        st.session_state.current_page = "settings"
+        st.rerun()
+    
+    # Navegación por páginas (mantener igual)
     if st.session_state.current_page == "dashboard":
         dashboard_main()
-        
-    elif st.session_state.current_page == "medical":
-        medical_area()
-        
-    elif st.session_state.current_page == "nutricion":
-        # ✅ Usar el módulo avanzado de nutrición
-        if areanutricion_available and mostrar_analisis_nutricion is not None:
-            try:
-                mostrar_analisis_nutricion()
-            except Exception as e:
-                st.error(f"❌ Error en el módulo de nutrición: {e}")
-                st.info("🔧 Verifica la configuración del módulo areanutricion.py")
-        else:
-            st.error("❌ Módulo de Área de Nutrición no disponible")
-            st.info("🔧 Verifica que el archivo src/modules/areanutricion.py esté correctamente configurado")
-
-    elif st.session_state.current_page == "physical":
-        physical_page()
     
-    # AGREGAR ESTA NUEVA SECCIÓN
     elif st.session_state.current_page == "dashboard_360":
         if dashboard_360_available and dashboard_360 is not None:
             try:
                 dashboard_360()
             except Exception as e:
-                st.error(f"❌ Error en el Panel del Jugador: {e}")
-                st.info("🔧 Verifica la configuración del módulo dashboard_360.py")
-                st.info("💡 Asegúrate de que los módulos médico, físico y nutrición estén funcionando")
+                st.error(f"❌ Error en Dashboard 360: {e}")
         else:
-            st.error("❌ Panel del Jugador no disponible")
-            st.info("🔧 Verifica que el archivo src/modules/360.py esté presente")
-            st.info("📋 Funcionalidades requeridas:")
-            st.code("""
-            - src/modules/360.py
-            - src/modules/areamedica.py  
-            - src/modules/areafisica.py
-            - src/modules/areanutricion.py
-            """)
-        
+            st.error("❌ Dashboard 360 no disponible")
+    
+    elif st.session_state.current_page == "medical":
+        medical_area()
+    
+    elif st.session_state.current_page == "nutricion":
+        if areanutricion_available and mostrar_analisis_nutricion is not None:
+            try:
+                mostrar_analisis_nutricion()
+            except Exception as e:
+                st.error(f"❌ Error en Área Nutrición: {e}")
+                st.info("🔧 Verifica la configuración del módulo de nutrición")
+        else:
+            st.error("❌ Área Nutrición no disponible")
+            st.info("🔧 Verifica que el archivo src/modules/areanutricion.py esté presente")
+    
+    elif st.session_state.current_page == "physical":
+        if physical_area_available and physical_area is not None:
+            try:
+                physical_area()
+            except Exception as e:
+                st.error(f"❌ Error en Área Física: {e}")
+                st.info("🔧 Verifica la configuración del módulo de área física")
+        else:
+            st.error("❌ Área Física no disponible")
+            st.info("🔧 Verifica que el archivo src/modules/areafisica.py esté presente")
+    
+    elif st.session_state.current_page == "medical_reports":
+        if reportes_medicos_available and main_reporte_medico is not None:
+            try:
+                main_reporte_medico()
+            except Exception as e:
+                st.error(f"❌ Error en Reportes Médicos: {e}")
+                st.info("🔧 Verifica la configuración del módulo de reportes médicos")
+        else:
+            st.error("❌ Reportes Médicos no disponible")
+            st.info("🔧 Verifica que el archivo src/modules/reportemedico.py esté presente")
+    
+    elif st.session_state.current_page == "administracion":
+        if administracion_available and main_administracion is not None:
+            try:
+                main_administracion()
+            except Exception as e:
+                st.error(f"❌ Error en el módulo de administración: {e}")
+                st.error(f"Detalle del error: {str(e)}")
+                st.info("🔧 Verifica la configuración del módulo de administración")
+                
+                # Mostrar traceback para debug
+                import traceback
+                st.code(traceback.format_exc())
+        else:
+            st.error("❌ Módulo de Administración no disponible")
+            st.info(f"🔧 administracion_available: {administracion_available}")
+            st.info(f"🔧 main_administracion: {main_administracion is not None}")
+    
     elif st.session_state.current_page == "settings":
         settings_page()
-        
-    else:
-        # ✅ Manejo de páginas no reconocidas
-        st.error(f"❌ Página '{st.session_state.current_page}' no reconocida")
-        st.info("🔄 Regresando al dashboard principal...")
-        st.session_state.current_page = "dashboard"
+    
+    # Botón de logout (mantener igual)
+    if st.sidebar.button("🚪 Cerrar Sesión", use_container_width=True):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
         st.rerun()
+
 
 
 
@@ -1044,14 +1113,18 @@ def physical_page():
         st.info("🔧 Verifica que el archivo physical_area.py esté presente")
 
 def main():
-    # Verificar autenticación
+    # Inicializar session state
     if 'authenticated' not in st.session_state:
         st.session_state.authenticated = False
+    
+    if 'current_page' not in st.session_state:
+        st.session_state.current_page = "dashboard"
     
     if not st.session_state.authenticated:
         login_page()
     else:
         main_dashboard()
+
 
 if __name__ == "__main__":
     main()
