@@ -418,6 +418,19 @@ def mostrar_graficos_interactivos(df):
                 st.plotly_chart(fig_pie, use_container_width=True)
 
 
+
+def append_google_sheet_row(sheet_id, worksheet_name, row_data, credentials_dict):
+    """Agrega una fila a una hoja de Google Sheets"""
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    creds = Credentials.from_service_account_info(credentials_dict, scopes=scopes)
+    gc = gspread.authorize(creds)
+    sh = gc.open_by_key(sheet_id)
+    ws = sh.worksheet(worksheet_name)
+    ws.append_row(row_data, value_input_option="USER_ENTERED")
+    return True
 # Agregar después de la función mostrar_graficos_interactivos:
 
 def mostrar_timeline_lesiones(df):

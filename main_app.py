@@ -815,7 +815,6 @@ def main_dashboard():
 def dashboard_main():
     """Dashboard principal del sistema CAR - Versión comercial simplificada"""
     
-    # CSS personalizado con tu branding
     st.markdown("""
     <style>
     .hero-container {
@@ -866,7 +865,6 @@ def dashboard_main():
     </style>
     """, unsafe_allow_html=True)
     
-    # Contenedor azul con título, subtítulo y logo
     st.markdown("""
     <div class="hero-container">
         <div class="hero-content">
@@ -884,60 +882,58 @@ def dashboard_main():
         <div class="hero-logo">
     """, unsafe_allow_html=True)
     
-    # Logo dentro del contenedor
     try:
-        st.image(r"C:\Users\dell\Desktop\Car\logo.png", width=200)
-    except:
-        # Respaldo con logo estilizado
-        st.markdown("""
-        <div style="
-            background: linear-gradient(45deg, #39FF14, #1E90FF); 
-            width: 150px; height: 150px; 
-            border-radius: 20px; 
-            display: flex; align-items: center; justify-content: center; 
-            color: #0B132B; font-size: 36px; font-weight: 900;
-            margin: 0 auto;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        ">
-            SRE
-        </div>
-        """, unsafe_allow_html=True)
+        logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
+        
+        if os.path.exists(logo_path):
+            st.image(logo_path, width=200)
+        else:
+            st.markdown("""
+            <div style="
+                background: linear-gradient(45deg, #39FF14, #1E90FF); 
+                width: 150px; height: 150px; 
+                border-radius: 20px; 
+                display: flex; align-items: center; justify-content: center; 
+                color: #0B132B; font-size: 36px; font-weight: 900;
+                margin: 0 auto;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            ">
+                CAR
+            </div>
+            """, unsafe_allow_html=True)
+    except Exception as e:
+        st.warning(f"⚠️ No se pudo cargar el logo: {e}")
     
     st.markdown("""
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    # Los Principios de la Digitalización - Versión Streamlit nativa
+    # ✅ AHORA SÍ SE VE - FUERA DEL TRY/EXCEPT
     st.markdown("## 🚀 Los Principios de la Digitalización Deportiva")
     st.markdown("---")
     
-    # Principio 1
     st.markdown("### 1️⃣ **Capacitación Profesional**")
     st.write("""
     La digitalización exitosa comienza con profesionales capacitados. Nuestro sistema no solo te da las herramientas, 
     sino que **forma a tu equipo** para maximizar el potencial de cada dato recopilado.
     """)
     
-    # Principio 2  
     st.markdown("### 2️⃣ **Centralización de Información**")
     st.write("""
     Todos los datos en un solo lugar: rendimiento físico, análisis técnico, bienestar del jugador y métricas de salud. 
     La **centralización** elimina silos de información y permite una visión integral del atleta.
     """)
     
-    # Principio 3
     st.markdown("### 3️⃣ **Toma de Decisiones Basada en Datos**")
     st.write("""
     Con información centralizada y profesionales capacitados, las decisiones dejan de ser intuitivas para convertirse en 
     **estratégicas y fundamentadas**. Cada cambio de entrenamiento, cada rotación, cada plan nutricional tiene respaldo científico.
     """)
     
-    # Beneficios de la Digitalización - Versión Streamlit nativa
     st.markdown("## 💡 ¿Por qué digitalizar tu club deportivo?")
     st.markdown("---")
     
-    # Crear las 3 columnas
     col1, col2, col3 = st.columns(3)
     
     with col1:
@@ -958,7 +954,6 @@ def dashboard_main():
         st.write("- **Automatización** de reportes y seguimiento")
         st.write("- **Integración** de todas las áreas del club en una plataforma")
     
-    # Solicitar Demo - Usando tu contenido de demo.py
     st.markdown("""
     <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 2rem; border-radius: 15px; margin: 2rem 0;">
         <h2 style="color: #39FF14; text-align: center; margin-bottom: 2rem;">Solicitar Demo</h2>
@@ -985,7 +980,6 @@ def dashboard_main():
             else:
                 st.error('Por favor completá al menos el nombre y email')
     
-    # Footer con tu información
     st.markdown("""
     <div style="color: rgba(255,255,255,0.6); font-size: 13px; padding: 2rem 0; text-align: center; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 2rem;">
         <p><strong>SRE — Sistema de Rendimiento Élite</strong></p>
@@ -993,7 +987,6 @@ def dashboard_main():
         <p>Desarrollado con ❤️ para la digitalización deportiva • © 2025</p>
     </div>
     """, unsafe_allow_html=True)
-    
     
 
 def settings_page():

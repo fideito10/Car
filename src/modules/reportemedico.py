@@ -10,41 +10,29 @@ import pandas as pd
 from datetime import datetime
 import sys
 import os
+import json
+
 
 # =============================================================================
 # 🔧 FUNCIONES AUXILIARES CORREGIDAS
 # =============================================================================
 
 def get_google_credentials():
-    """Obtener credenciales de Google desde secrets con validación"""
+    """Obtiene las credenciales de Google desde el archivo JSON"""
     try:
-        # 🔍 Verificar si existen las credenciales
-        if "google_credentials" not in st.secrets:
-            st.error("❌ No se encontraron credenciales de Google en secrets.toml")
-            st.info("📝 Verifica que el archivo secrets.toml contenga la sección [google_credentials]")
-            return None
-            
-        creds = st.secrets["google_credentials"]
-        
-        # 🔍 Verificar campos obligatorios
-        required_fields = ["type", "project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri"]
-        missing_fields = [field for field in required_fields if field not in creds]
-        
-        if missing_fields:
-            st.error(f"❌ Faltan campos en credenciales: {missing_fields}")
-            return None
-            
-        st.success("✅ Credenciales de Google cargadas correctamente")
-        return dict(creds)
-        
+        with open(r"C:\Users\dell\Desktop\Car\credentials\service_account.json", "r") as f:
+            creds = json.load(f)
+        return creds
     except Exception as e:
-        st.error(f"❌ Error cargando credenciales: {str(e)}")
+        st.error(f"❌ Error cargando credenciales: {e}")
         return None
-
+    
+    
+    
 def conectar_base_central():
     """Conectar a Base Central - puede ser una hoja diferente"""
     try:
-        st.info("🔄 Conectando a Base Central...")
+        
         from areamedica import read_google_sheet_with_headers
 
         # Usar el ID correcto de la hoja base de jugadores
@@ -75,7 +63,7 @@ def conectar_base_central():
                 'nombre': nombre,
                 'dni': str(registro.get('DNI', registro.get('dni', ''))).strip(),
                 'categoria': registro.get('Categoria', registro.get('categoria', registro.get('División', 'Sin Categoría'))).strip(),
-                'posicion': registro.get('Posición', registro.get('posicion', '')).strip(),
+                'posicion': registro.get('Posicion', registro.get('posicion', '')).strip(),
                 'estado': registro.get('Estado', registro.get('estado', 'Activo')).strip(),
                 'telefono': registro.get('Teléfono', registro.get('telefono', '')).strip(),
                 'email': registro.get('Email', registro.get('email', '')).strip()
@@ -83,7 +71,7 @@ def conectar_base_central():
             if jugador['nombre'] and jugador['dni']:
                 jugadores.append(jugador)
 
-        st.success(f"✅ Base Central cargada: {len(jugadores)} jugadores válidos de {len(data)} registros totales")
+        
         return jugadores
 
     except ImportError:
@@ -102,11 +90,11 @@ def normalizar_categoria(cat):
 def conectar_area_medica():
     """Conectar a Área Médica con manejo mejorado de errores"""
     try:
-        st.info("🏥 Conectando a Área Médica...")
+        
         
         try:
             from areamedica import read_google_sheet_with_headers
-            st.success("✅ Módulo de Área Médica encontrado")
+            
         except ImportError:
             st.warning("⚠️ Módulo areamedica.py no encontrado - Continuando sin datos médicos")
             return []
@@ -127,7 +115,6 @@ def conectar_area_medica():
             return []
         
         medical_data = result.get('data', [])
-        st.success(f"✅ Área Médica: {len(medical_data)} registros cargados")
         return medical_data
             
     except Exception as e:
@@ -230,9 +217,31 @@ def diagnosticar_sistema():
             else:
                 st.error("❌ Conexión fallida")
 
+
+def estado_entrenamiento_actual(historial_medico):
+    """
+    Devuelve 'Activo', 'Diferenciado' o 'Inactivo' según el último registro médico.
+    """
+    if not historial_medico:
+        return None
+    ultimo = historial_medico[0]
+    puede_entrenar = ultimo.get('¿Puede participar en entrenamientos?', '').strip().lower()
+    if puede_entrenar == 'si' or puede_entrenar == 'sí':
+        return 'Activo'
+    elif puede_entrenar == 'solo con entrenamiento diferenciado':
+        return 'Diferenciado'
+    elif puede_entrenar == 'no':
+        return 'Inactivo'
+    return None    
+
 def main_reporte_medico():
     """Función principal - Interfaz simplificada con diagnóstico"""
     
+    # 1. CARGAR DATOS (Esto faltaba y es crucial para que funcionen los filtros)
+    with st.spinner("🔄 Cargando base de datos de jugadores y reportes médicos..."):
+         jugadores = conectar_base_central()
+         datos_medicos = conectar_area_medica()
+
     # 🎨 CSS personalizado
     st.markdown("""
     <style>
@@ -280,51 +289,24 @@ def main_reporte_medico():
     </div>
     """, unsafe_allow_html=True)
     
-    # 🔧 Botón de diagnóstico
-    col1, col2 = st.columns([3, 1])
-    with col2:
-        if st.button("🔧 Diagnóstico", help="Verificar configuración del sistema"):
-            diagnosticar_sistema()
-            st.stop()
-    
-        # 📊 Cargar datos con mejor feedback
-    with st.spinner("🔄 Cargando datos del sistema..."):
-        jugadores = conectar_base_central()
-        datos_medicos = conectar_area_medica()
 
-    # 👀 Mostrar DataFrames para inspección
-    st.markdown("### 👀 **Vista previa de datos de jugadores**")
-    if jugadores:
-        st.dataframe(pd.DataFrame(jugadores))
-    else:
-        st.warning("No se encontraron datos de jugadores.")
 
-    st.markdown("### 👀 **Vista previa de historial médico**")
-    if datos_medicos:
-        st.dataframe(pd.DataFrame(datos_medicos))
-    else:
-        st.warning("No se encontraron datos médicos.")
-    
-    # 🎯 Resto de la interfaz (sin cambios)...
-    # [El resto del código sigue igual desde aquí]
-    
-       # 🔍 FILTROS PRINCIPALES
     st.markdown('<div class="filter-container">', unsafe_allow_html=True)
     st.markdown("### 🔍 **Filtros de Búsqueda**")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        # 📂 Filtro por categoría (mezcla jugadores y datos médicos)
-        categorias_jugadores = [
-            normalizar_categoria(j.get('categoria', j.get('Categoria', j.get('División', 'Sin Categoría')))
-            ) for j in jugadores if j.get('categoria') or j.get('Categoria') or j.get('División')
-        ]
-        categorias_medicas = [
-            normalizar_categoria(r.get('Categoria', r.get('categoria', r.get('División', 'Sin Categoría')))
-            ) for r in datos_medicos if r.get('Categoria') or r.get('categoria') or r.get('División')
-        ]
-        categorias_disponibles = sorted(list(set(categorias_jugadores + categorias_medicas)))
+        # Filtro por categoría
+        if jugadores:
+            categorias_jugadores = [
+                normalizar_categoria(j.get('categoria', 'Sin Categoría'))
+                for j in jugadores if j.get('categoria')
+            ]
+            categorias_disponibles = sorted(list(set(categorias_jugadores)))
+        else:
+            categorias_disponibles = []
+
         categoria_seleccionada = st.selectbox(
             "**📂 Categoría:**",
             options=['Todas'] + categorias_disponibles,
@@ -332,19 +314,22 @@ def main_reporte_medico():
         )
         
     with col2:
-        # 👤 Filtro por nombre (solo jugadores de la categoría seleccionada)
-        if categoria_seleccionada != 'Todas':
-            registros_categoria = [
-                r for r in datos_medicos
-                if normalizar_categoria(r.get('Categoria', r.get('categoria', r.get('División', 'Sin Categoría'))) ) == categoria_seleccionada
-            ]
-        else:
-            registros_categoria = datos_medicos
+        # Filtro por nombre
+        jugadores_filtrados = []
+        if jugadores:
+            if categoria_seleccionada != 'Todas':
+                jugadores_filtrados = [
+                    j for j in jugadores
+                    if normalizar_categoria(j.get('categoria', 'Sin Categoría')) == categoria_seleccionada
+                ]
+            else:
+                jugadores_filtrados = jugadores
 
-        nombres_disponibles = sorted(list(set([
-            registro.get('Nombre y Apellido', f"{registro.get('Nombre', '').strip()} {registro.get('Apellido', '').strip()}").strip()
-            for registro in registros_categoria if registro.get('Nombre') or registro.get('Nombre y Apellido')
-        ])))
+        nombres_disponibles = sorted([
+            j.get('nombre', '').strip()
+            for j in jugadores_filtrados if j.get('nombre')
+        ])
+        
         jugador_seleccionado = st.selectbox(
             "**👤 Nombre y Apellido:**",
             options=['Seleccionar jugador...'] + nombres_disponibles,
@@ -352,182 +337,222 @@ def main_reporte_medico():
         )
     
     st.markdown('</div>', unsafe_allow_html=True)
-    
-    # 🎯 Filtrar registros médicos según selección
-    registros_filtrados = datos_medicos
-    
-    # Filtrar por categoría
-    if categoria_seleccionada != 'Todas':
-        registros_filtrados = [
-            r for r in registros_filtrados
-            if r.get('Categoria', r.get('categoria', r.get('División', 'Sin Categoría'))) == categoria_seleccionada
-        ]
-    
-    # Encontrar jugador específico
+
+    # 🎯 Encontrar jugador seleccionado en la lista de jugadores (Base Central)
     jugador_actual = None
     if jugador_seleccionado != 'Seleccionar jugador...':
-        for registro in registros_filtrados:
-            nombre_registro = registro.get('Nombre y Apellido', f"{registro.get('Nombre', '').strip()} {registro.get('Apellido', '').strip()}").strip()
-            if nombre_registro == jugador_seleccionado:
-                jugador_actual = registro
+        for jugador in jugadores:
+            if jugador.get('nombre', '').strip() == jugador_seleccionado:
+                jugador_actual = jugador
                 break
     
- # ...existing code...
+    
+    # Botón para cargar nuevo reporte
+    if jugador_seleccionado != 'Seleccionar jugador...':
+        if st.button("➕ Nuevo reporte", key="nuevo_reporte"):
+            st.session_state['mostrar_formulario_reporte'] = True
+
+    # Mostrar formulario si el botón fue presionado
+    if st.session_state.get('mostrar_formulario_reporte', False) and jugador_seleccionado != 'Seleccionar jugador...':
+        st.markdown("### 📝 Nuevo Reporte Médico")
+        with st.form("formulario_reporte_medico"):
+            fecha = st.date_input("Fecha de Atención", value=datetime.today())
+            nombre_doctor = st.text_input("Nombre del Doctor")
+            tipo_lesion = st.selectbox(
+                "Tipo de Lesión",
+                [
+                    "Esguince",
+                    "Contractura muscular",
+                    "Desgarro muscular",
+                    "Fractura",
+                    "Luxación",
+                    "Contusión",
+                    "Lesión ligamentosa",
+                    "Lesión meniscal",
+                    "Conmoción",
+                    "Corte / Herida",
+                    "Otro"
+                ]
+            )
+            severidad = st.selectbox("Severidad de la Lesión", ["Leve", "Moderada", "Grave"])
+            cuando_ocurrio = st.date_input("¿Cuándo ocurrió la lesión?", value=datetime.today())
+            como_ocurrio = st.text_area("¿Cómo ocurrió la lesión?")
+            parte_afectada = st.selectbox(
+                "Parte del Cuerpo Afectada",
+                [
+                    "Cabeza",
+                    "Cuello",
+                    "Hombro",
+                    "Brazo",
+                    "Codo",
+                    "Antebrazo",
+                    "Muñeca",
+                    "Mano",
+                    "Dedos",
+                    "Pecho",
+                    "Espalda",
+                    "Cadera",
+                    "Muslo",
+                    "Rodilla",
+                    "Pierna",
+                    "Tobillo",
+                    "Pie",
+                    "Costillas",
+                    "Columna",
+                    "Oreja",
+                    "Ojo",
+                    "Nariz",
+                    "Otro"
+                ]
+            )
+            puede_entrenar = st.selectbox("¿Puede participar en entrenamientos?", ["Sí", "No", "Solo con entrenamiento diferenciado"])
+            requiere_cirugia = st.selectbox("¿Requiere Cirugía?", ["No", "Sí"])
+            proxima_evaluacion = st.date_input("Fecha de Próxima Evaluación", value=datetime.today())
+            estado_caso = st.text_input("Estado del Caso")
+            tratamiento = st.text_area("Tratamiento Prescrito")
+            observaciones = st.text_area("Observaciones Adicionales")
+            submit = st.form_submit_button("Guardar reporte")
+
+            if submit:
+                # --- GUARDAR REPORTE EN GOOGLE SHEETS ---
+                categoria_jugador = jugador_actual.get('categoria', 'Sin Categoría')
+                posicion_jugador = jugador_actual.get('posicion', 'No especificada')
+                nombre_jugador = jugador_actual.get('nombre', '')
+                dni_jugador = jugador_actual.get('dni', '')
+                
+                # Marca temporal actual
+                marca_temporal = datetime.now().strftime("%d/%m/%Y %H:%M")
+                
+                nuevo_reporte = [
+                    marca_temporal,                # Marca temporal
+                    nombre_doctor,                 # Nombre del Doctor
+                    str(fecha),                    # Fecha
+                    nombre_jugador,                # Nombre y Apellido
+                    dni_jugador,                   # Dni
+                    categoria_jugador,             # Categoría
+                    posicion_jugador,              # Posición del jugador
+                    tipo_lesion,                   # Tipo de Lesión
+                    parte_afectada,                # Parte del Cuerpo Afectada
+                    severidad,                     # Severidad de la Lesión
+                    str(cuando_ocurrio),                # ¿Cuándo ocurrió la lesión?
+                    como_ocurrio,                  # ¿Cómo ocurrió la lesión?
+                    requiere_cirugia,              # ¿Requiere Cirugía?
+                    puede_entrenar,                # ¿Puede participar en entrenamientos?
+                    str(proxima_evaluacion),       # Fecha de Próxima Evaluación
+                    observaciones,                 # Observaciones Adicionales
+                    tratamiento                    # Medicamentos recetados (si corresponde)
+                ]
+                google_creds = get_google_credentials()
+        # Guardar el reporte
+        if google_creds:
+            try:
+                from areamedica import append_google_sheet_row
+                append_google_sheet_row(
+                    sheet_id='1zGyW-M_VV7iyDKVB1TTd0EEP3QBjdoiBmSJN2tK-H7w',
+                    worksheet_name='Respuestas de formulario 1',
+                    row_data=nuevo_reporte,
+                    credentials_dict=google_creds
+                )
+                st.success("✅ Reporte guardado en Google Sheets")
+                # Recargar datos médicos para mostrar el historial actualizado
+                datos_medicos = conectar_area_medica()
+            except Exception as e:
+                st.error(f"❌ Error guardando reporte: {e}")
+        else:
+            st.error("❌ No se pudo obtener credenciales de Google")
+        # Ocultar el formulario
+        st.session_state['mostrar_formulario_reporte'] = False
+
+
+
     if jugador_actual:
-        # 📊 Obtener historial médico
-        dni_jugador = jugador_actual.get('DNI', jugador_actual.get('Dni', '')).strip()
+        dni_jugador = jugador_actual.get('dni', '').strip()
         historial_medico = obtener_historial_por_dni(dni_jugador, datos_medicos)
         
         st.markdown('<div class="resumen-card">', unsafe_allow_html=True)
         
-        # 👤 Información básica del jugador
-        nombre_jugador = jugador_actual.get('Nombre y Apellido', f"{jugador_actual.get('Nombre', '').strip()} {jugador_actual.get('Apellido', '').strip()}").strip()
-        categoria_jugador = jugador_actual.get('Categoria', jugador_actual.get('categoria', jugador_actual.get('División', 'Sin Categoría')))
-        posicion_jugador = jugador_actual.get('Posición', jugador_actual.get('posicion', '')).strip()
-        estado_jugador = jugador_actual.get('Estado', jugador_actual.get('estado', 'Activo')).strip()
-        telefono_jugador = jugador_actual.get('Teléfono', jugador_actual.get('telefono', '')).strip()
-        email_jugador = jugador_actual.get('Email', jugador_actual.get('email', '')).strip()
+        nombre_jugador = jugador_actual.get('nombre', 'Sin Nombre')
+        categoria_jugador = jugador_actual.get('categoria', 'Sin Categoría')
+        posicion_jugador = jugador_actual.get('posicion', 'No especificada')
+        estado_jugador = jugador_actual.get('estado', 'Activo')
+        telefono_jugador = jugador_actual.get('telefono', '')
+        email_jugador = jugador_actual.get('email', '')
         
-        st.markdown(f"## 👤 **{nombre_jugador}**")
         
-        col1, col2, col3 = st.columns(3)
         
-        with col1:
-            st.markdown(f"""
-            **🆔 DNI:** {dni_jugador}  
-            **🏉 Categoría:** {categoria_jugador}  
-            **⚽ Posición:** {posicion_jugador}
-            """)
-        
-        with col2:
-            estado_emoji = "🟢" if estado_jugador == 'Activo' else "🔴"
-            st.markdown(f"""
-            **📊 Estado:** {estado_emoji} {estado_jugador}  
-            **📞 Teléfono:** {telefono_jugador}  
-            **📧 Email:** {email_jugador}
-            """)
+       
+        st.markdown(f"<h2 style='text-align:left; color:#1e3c72;'>{nombre_jugador}</h2>", unsafe_allow_html=True)
+        estado_entrenamiento = estado_entrenamiento_actual(historial_medico)
+        if estado_entrenamiento == 'Activo':
+            st.markdown("### Estado: ✅ Activo (Apto para entrenar)")
+        elif estado_entrenamiento == 'Diferenciado':
+            st.markdown("### Estado: 🟡 Diferenciado (Solo entrenamiento diferenciado)")
+        elif estado_entrenamiento == 'Inactivo':
+            st.markdown("### Estado: 🔴 Inactivo (No apto para entrenar)")
+        else:
+            st.markdown(f"### Estado: {'✅ Activo' if estado_jugador == 'Activo' else '🔴 Inactivo'} (sin registro médico reciente)")
 
+        st.markdown("---")
+
+        c1, c2, c3, c4 = st.columns(4)
+
+        with c1:
+            st.caption("Posición")
+            st.markdown(f"#### {posicion_jugador}")
+            
+        with c2:
+            st.caption("Documento")
+            st.markdown(f"#### {dni_jugador}")
         
-        with col3:
-            # Estadísticas rápidas del historial
-            total_registros = len(historial_medico)
-            registros_2024 = len([h for h in historial_medico if '2024' in str(h.get('Fecha de Atención', h.get('Marca temporal', '')))])
-            lesiones_graves = len([h for h in historial_medico if 'alta' in str(h.get('Severidad de la Lesión', '')).lower() or 'grave' in str(h.get('Severidad de la Lesión', '')).lower()])
+        with c3:
+            st.caption("Teléfono")
+            st.markdown(f"#### {telefono_jugador if telefono_jugador else '—'}")
+
+        with c4:
+            st.caption("Email")
+            st.markdown(f"#### {email_jugador if email_jugador else '—'}")
             
-            st.markdown(f"""
-            <div class="stat-card">
-                <h3>📋 {total_registros}</h3>
-                <p>Registros Médicos</p>
-            </div>
+        st.markdown("---")
             
-            <div class="stat-card">
-                <h3>📅 {registros_2024}</h3>
-                <p>En 2024</p>
-            </div>
-            
-            <div class="stat-card">
-                <h3>⚠️ {lesiones_graves}</h3>
-                <p>Lesiones Graves</p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # 🏥 Mostrar historial si existe
         if historial_medico:
-            st.markdown("---")
-            st.markdown("### 🏥 **Resumen de Historia Clínica**")
-            
-            # Mostrar último registro
             ultimo_registro = historial_medico[0]
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown("#### 📊 **Estado Actual**")
-                puede_entrenar = ultimo_registro.get('¿Puede participar en entrenamientos?', 'No especificado')
-                
-                if 'sí' in puede_entrenar.lower():
-                    st.success(f"✅ Puede entrenar: {puede_entrenar}")
-                elif 'no' in puede_entrenar.lower():
-                    st.error(f"❌ No puede entrenar: {puede_entrenar}")
-                else:
-                    st.warning(f"❓ Estado incierto: {puede_entrenar}")
-                
-                st.markdown(f"**🩺 Último Diagnóstico:** {ultimo_registro.get('Tipo de Lesión', 'Sin diagnóstico')}")
-                st.markdown(f"**📅 Última Consulta:** {ultimo_registro.get('Fecha de Atención', ultimo_registro.get('Marca temporal', 'Sin fecha'))}")
-            
-            with col2:
+            col_hist1,= st.columns(1)
+            with col_hist1:
                 st.markdown("#### 📋 **Historial Resumido**")
                 st.markdown(f"**Total de registros:** {len(historial_medico)}")
-                
-                # Lesiones más frecuentes
                 lesiones = [h.get('Tipo de Lesión', '') for h in historial_medico if h.get('Tipo de Lesión')]
                 if lesiones:
                     lesion_mas_frecuente = max(set(lesiones), key=lesiones.count)
                     st.markdown(f"**Lesión más frecuente:** {lesion_mas_frecuente}")
-            
-            # Mostrar registros expandibles
             st.markdown("#### 📋 **Registros Detallados**")
-            
-            for i, registro in enumerate(historial_medico[:3]):  # Solo los 3 más recientes
+            for i, registro in enumerate(historial_medico[:3]):
                 fecha = registro.get('Fecha de Atención', registro.get('Marca temporal', 'Sin fecha'))
                 diagnostico = registro.get('Tipo de Lesión', 'Sin diagnóstico')
-                
                 with st.expander(f"📄 {i+1}. {fecha} - {diagnostico}", expanded=(i==0)):
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
+                    st.markdown(f"<h3 style='margin-bottom:0.5rem;'>{i+1}. {fecha} - {diagnostico}</h3>", unsafe_allow_html=True)
+                    col_det1, col_det2 = st.columns(2)
+                    with col_det1:
                         st.markdown(f"""
                         **👨‍⚕️ Doctor:** {registro.get('Nombre del Doctor', 'No especificado')}  
                         **🩺 Diagnóstico:** {diagnostico}  
                         **⚠️ Severidad:** {registro.get('Severidad de la Lesión', 'No especificada')}  
                         **🎯 Parte Afectada:** {registro.get('Parte del Cuerpo Afectada', 'No especificada')}
                         """)
-                    
-                    with col2:
+                    with col_det2:
                         st.markdown(f"""
                         **🏃‍♂️ Puede Entrenar:** {registro.get('¿Puede participar en entrenamientos?', 'No especificado')}  
                         **🔪 Requiere Cirugía:** {registro.get('¿Requiere Cirugía?', 'No especificado')}  
                         **📅 Próx. Evaluación:** {registro.get('Fecha de Próxima Evaluación', 'No programada')}  
                         **📊 Estado Caso:** {registro.get('Estado del Caso', 'No especificado')}
                         """)
-                    
                     if registro.get('Tratamiento Prescrito'):
                         st.markdown(f"**💊 Tratamiento:** {registro['Tratamiento Prescrito']}")
-                    
                     if registro.get('Observaciones Adicionales'):
                         st.markdown(f"**📝 Observaciones:** {registro['Observaciones Adicionales']}")
-        
         else:
             st.info("📋 **Sin registros médicos previos** - Jugador sin historial clínico registrado")
-        
         st.markdown('</div>', unsafe_allow_html=True)
-    
 
-    else:
-        # 📋 Mostrar lista de jugadores disponibles
-        if categoria_seleccionada != 'Todas':
-            st.markdown(f"### 👥 Jugadores en **{categoria_seleccionada}** ({len(registros_filtrados)} total)")
-        else:
-            st.markdown(f"### 👥 Todos los Jugadores ({len(registros_filtrados)} total)")
-        
-        # Mostrar lista organizada
-# ...existing code...
-        for registro in registros_filtrados[:10]:  # Mostrar solo los primeros 10
-            nombre = registro.get('Nombre y Apellido', f"{registro.get('Nombre', '').strip()} {registro.get('Apellido', '').strip()}").strip()
-            dni = registro.get('DNI', registro.get('Dni', '')).strip()
-            categoria = registro.get('Categoria', registro.get('categoria', registro.get('División', 'Sin Categoría')))
-            estado = registro.get('Estado', registro.get('estado', 'Activo')).strip()
-            historial_count = len(obtener_historial_por_dni(dni, datos_medicos))
-            historial_emoji = "🏥" if historial_count > 0 else "👤"
-            estado_emoji = "🟢" if estado == 'Activo' else "🔴"
-            
-            st.markdown(f"""
-            **{historial_emoji} {estado_emoji} {nombre}**  
-            📂 {categoria} | 🆔 {dni} | 📋 {historial_count} registros médicos
-            """)
-# ...existing code...
-        
-        if len(registros_filtrados) > 10:
-            st.info(f"... y {len(registros_filtrados) - 10} jugadores más. Selecciona uno para ver detalles.")
 
     # Footer informativo
     st.markdown("---")
