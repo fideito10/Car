@@ -112,22 +112,37 @@ except ImportError as e:
 
 
 
+# Configuración de credenciales - VERSIÓN CORREGIDA
 def get_gcp_credentials():
     """Obtener credenciales de Google Cloud desde Streamlit secrets o archivo local"""
     try:
-        # Si ya tenemos credenciales globales, usarlas
-        if 'credentials' in globals() and credentials is not None:
-            return credentials
-            
-        # Intentar cargar desde Streamlit Cloud
+        # Intentar cargar desde Streamlit Cloud (PRODUCCIÓN)
         if hasattr(st, 'secrets') and "gcp_service_account" in st.secrets:
             credentials_dict = dict(st.secrets["gcp_service_account"])
-            return service_account.Credentials.from_service_account_info(credentials_dict)
+            return service_account.Credentials.from_service_account_info(
+                credentials_dict,
+                scopes=[
+                    "https://www.googleapis.com/auth/spreadsheets",
+                    "https://www.googleapis.com/auth/drive"
+                ]
+            )
         
-        # Para desarrollo local
-        credentials_file = 'credentials/service-account-key.json'
-        if os.path.exists(credentials_file):
-            return service_account.Credentials.from_service_account_file(credentials_file)
+        # Para desarrollo local - buscar archivos
+        possible_paths = [
+            "credentials/service_account.json",
+            "credentials/service-account-key.json",
+            "../credentials/service_account.json"
+        ]
+        
+        for cred_path in possible_paths:
+            if os.path.exists(cred_path):
+                return service_account.Credentials.from_service_account_file(
+                    cred_path,
+                    scopes=[
+                        "https://www.googleapis.com/auth/spreadsheets",
+                        "https://www.googleapis.com/auth/drive"
+                    ]
+                )
         
         # Sin credenciales disponibles
         return None
@@ -135,6 +150,9 @@ def get_gcp_credentials():
     except Exception as e:
         st.error(f"Error al obtener credenciales: {str(e)}")
         return None
+
+# Configurar credenciales globales al inicio
+credentials = get_gcp_credentials()
 
 def load_json_data(filename, default_data=None):
     """Función de respaldo para cargar JSON"""
