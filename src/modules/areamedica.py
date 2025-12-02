@@ -21,16 +21,15 @@ def get_google_credentials():
         # Primero intentar obtener desde st.secrets (para Streamlit Cloud)
         if hasattr(st, 'secrets') and "gcp_service_account" in st.secrets:
             return dict(st.secrets["gcp_service_account"])
-    except Exception:
-        pass
+    except Exception as e:
+        st.error(f"Error al cargar secrets: {e}")
     
     # Si estamos local o no hay secrets, leer archivo
     try:
         possible_paths = [
             "credentials/service_account.json",
             "../credentials/service_account.json", 
-            "credentials/car-digital-441319-1a4e4b5c11c2.json",
-            "../credentials/car-digital-441319-1a4e4b5c11c2.json"
+            "C:/Users/dell/Desktop/Car/credentials/service_account.json"
         ]
         
         for cred_path in possible_paths:
@@ -38,12 +37,13 @@ def get_google_credentials():
                 with open(cred_path) as f:
                     return json.load(f)
         
-        raise FileNotFoundError("No se encontró archivo de credenciales")
+        st.error("❌ No se encontró archivo de credenciales local")
+        return None
         
     except Exception as e:
-        st.error(f"❌ Error cargando credenciales: {e}")
+        st.error(f"❌ Error cargando credenciales locales: {e}")
         return None
-
+    
 # Importaciones opcionales
 try:
     from sheets.formularios_google_sheets import FormulariosGoogleSheets

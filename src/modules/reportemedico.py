@@ -18,11 +18,31 @@ import json
 # =============================================================================
 
 def get_google_credentials():
-    """Obtiene las credenciales de Google desde el archivo JSON"""
+    """
+    Obtiene las credenciales de Google de forma segura desde st.secrets o archivo local
+    """
     try:
-        with open(r"C:\Users\dell\Desktop\Car\credentials\service_account.json", "r") as f:
-            creds = json.load(f)
-        return creds
+        # Primero intentar obtener desde st.secrets (para Streamlit Cloud)
+        if hasattr(st, 'secrets') and "gcp_service_account" in st.secrets:
+            return dict(st.secrets["gcp_service_account"])
+    except Exception:
+        pass
+    
+    # Si estamos local o no hay secrets, leer archivo
+    try:
+        possible_paths = [
+            "credentials/service_account.json",
+            "../credentials/service_account.json", 
+            "C:/Users/dell/Desktop/Car/credentials/service_account.json"
+        ]
+        
+        for cred_path in possible_paths:
+            if os.path.exists(cred_path):
+                with open(cred_path) as f:
+                    return json.load(f)
+        
+        raise FileNotFoundError("No se encontró archivo de credenciales")
+        
     except Exception as e:
         st.error(f"❌ Error cargando credenciales: {e}")
         return None

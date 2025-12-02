@@ -7,15 +7,23 @@ from datetime import datetime, date
 from google.oauth2 import service_account
 
 def get_gcp_credentials():
-    """Obtener credenciales desde service_account.json SIN MENSAJES DEBUG"""
+    """Obtener credenciales desde Streamlit secrets"""
     try:
-        # Ruta al archivo real de credenciales
-        credentials_path = 'credentials/service_account.json'
-        
-        if os.path.exists(credentials_path):
-            # **ELIMINAR ESTOS MENSAJES:**
-            # st.info(f"🔄 Cargando credenciales desde: {credentials_path}")
+        # Intentar cargar desde secrets de Streamlit Cloud
+        if hasattr(st, 'secrets') and 'gcp_service_account' in st.secrets:
+            credentials_info = st.secrets['gcp_service_account']
+            credentials = service_account.Credentials.from_service_account_info(
+                credentials_info,
+                scopes=[
+                    "https://www.googleapis.com/auth/spreadsheets",
+                    "https://www.googleapis.com/auth/drive"
+                ]
+            )
+            return credentials
             
+        # Fallback: intentar archivo local (para desarrollo)
+        credentials_path = 'credentials/service_account.json'
+        if os.path.exists(credentials_path):
             with open(credentials_path, 'r') as f:
                 credentials_info = json.load(f)
                 credentials = service_account.Credentials.from_service_account_info(
@@ -25,18 +33,13 @@ def get_gcp_credentials():
                         "https://www.googleapis.com/auth/drive"
                     ]
                 )
-                
-                # **ELIMINAR ESTE MENSAJE:**
-                # st.success("✅ Credenciales cargadas correctamente")
                 return credentials
-        else:
-            st.error(f"❌ No se encontró el archivo de credenciales: {credentials_path}")
-            st.info("💡 Asegúrese de que el archivo service_account.json esté en la carpeta credentials/")
-            return None
-            
-    except json.JSONDecodeError:
-        st.error("❌ El archivo service_account.json no es un JSON válido")
+        
+        # Si no encuentra nada
+        st.error("❌ No se encontraron credenciales de Google Cloud")
+        st.info("💡 Configura las credenciales en Streamlit secrets")
         return None
+            
     except Exception as e:
         st.error(f"❌ Error cargando credenciales: {e}")
         return None

@@ -17,8 +17,8 @@ def get_google_credentials():
         # Primero intentar obtener desde st.secrets (para Streamlit Cloud)
         if hasattr(st, 'secrets') and "gcp_service_account" in st.secrets:
             return dict(st.secrets["gcp_service_account"])
-    except Exception:
-        pass
+    except Exception as e:
+        st.error(f"Error al cargar secrets: {e}")
     
     # Si estamos local o no hay secrets, leer archivo
     try:
@@ -33,11 +33,14 @@ def get_google_credentials():
                 with open(cred_path) as f:
                     return json.load(f)
         
-        raise FileNotFoundError("No se encontró archivo de credenciales")
+        st.error("❌ No se encontró archivo de credenciales local")
+        return None
         
     except Exception as e:
-        st.error(f"❌ Error cargando credenciales: {e}")
+        st.error(f"❌ Error cargando credenciales locales: {e}")
         return None
+    
+    
 
 def cargar_hoja(sheet_id: str, nombre_hoja: str, rutas_credenciales=None) -> pd.DataFrame:
     """
