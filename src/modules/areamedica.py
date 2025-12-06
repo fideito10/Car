@@ -515,9 +515,9 @@ def main_streamlit():
             df = create_dataframe_from_sheet()
             
             if df is not None and not df.empty:
-                # Nombres de columnas
+                # NOMBRES DE COLUMNAS CORRECTOS
                 col_categoria = 'Categoría'
-                col_severidad = 'Severidad de la lesión'
+                col_severidad = 'Severidad de la Lesión'  # 👈 CORREGIDO: Mayúscula en Lesión
                 
                 # FILTROS EN FILA HORIZONTAL
                 st.markdown("### 🔍 Filtros")
@@ -599,16 +599,44 @@ def main_streamlit():
                     # Gráfico de Torta por Gravedad
                     st.markdown("#### 🎯 Jugadores por Gravedad")
                     if col_severidad in df_filtrado.columns and not df_filtrado.empty:
-                        severidad_counts = df_filtrado[col_severidad].value_counts()
+                        # Limpiar y filtrar datos vacíos
+                        df_severidad = df_filtrado[df_filtrado[col_severidad].notna() & (df_filtrado[col_severidad] != '')]
                         
-                        fig_pie = px.pie(
-                            values=severidad_counts.values,
-                            names=severidad_counts.index,
-                            color_discrete_sequence=['#22c55e', '#eab308', '#ef4444', '#dc2626']
-                        )
-                        
-                        fig_pie.update_layout(height=400)
-                        st.plotly_chart(fig_pie, use_container_width=True)
+                        if not df_severidad.empty:
+                            severidad_counts = df_severidad[col_severidad].value_counts()
+                            
+                            fig_pie = px.pie(
+                                values=severidad_counts.values,
+                                names=severidad_counts.index,
+                                color_discrete_sequence=['#22c55e', '#eab308', '#ef4444', '#dc2626'],
+                                hole=0.3
+                            )
+                            
+                            fig_pie.update_traces(
+                                textposition='inside',
+                                textinfo='percent+label'
+                            )
+                            
+                            fig_pie.update_layout(
+                                height=400,
+                                showlegend=True,
+                                legend=dict(
+                                    orientation="v",
+                                    yanchor="middle",
+                                    y=0.5,
+                                    xanchor="left",
+                                    x=1.02
+                                )
+                            )
+                            
+                            st.plotly_chart(fig_pie, use_container_width=True)
+                        else:
+                            # Mensaje cuando no hay datos
+                            if categoria_seleccionada != 'Todas':
+                                st.warning(f"⚠️ No hay datos de gravedad para **{categoria_seleccionada}**")
+                                st.info("💡 Verifica que la columna tenga valores en tu Google Sheet")
+                            else:
+                                st.warning("⚠️ No hay datos de gravedad disponibles")
                     else:
                         st.info("No hay datos para mostrar")
                 

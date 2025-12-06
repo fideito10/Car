@@ -94,6 +94,251 @@ def resaltar_valores(s):
     is_low = s_float < s_float.quantile(0.25)
     return ['background-color: #b6fcd5' if h else 'background-color: #ffb6b6' if l else '' for h, l in zip(is_high, is_low)]
 
+def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
+    """
+    Muestra una tabla con código de colores según rendimiento vs promedio
+    """
+    if df.empty:
+        st.warning("⚠️ No hay datos para mostrar con los filtros seleccionados")
+        return
+    
+    # Obtener unidad del dataframe
+    unidad = df['unidad'].iloc[0] if 'unidad' in df.columns else ""
+    
+    # Crear columna con valor + unidad
+    df_display = df.copy()
+    
+    # 👉 CONVERSIÓN CORRECTA: Convertir valores a numérico primero
+    df_display[valor_col] = pd.to_numeric(df_display[valor_col], errors='coerce')
+    
+    df_display['Valor Completo'] = df_display[valor_col].apply(
+        lambda x: f"{x:.10g} {unidad}" if pd.notna(x) else ""
+    )
+    
+    # Seleccionar y renombrar columnas
+    columnas_mostrar = ['Nombre y Apellido', 'Posición del jugador', 'Categoría', 'Valor Completo', valor_col]
+    df_tabla = df_display[columnas_mostrar].copy()
+    df_tabla.columns = ['Nombre', 'Posición', 'Categoría', 'Resultado', 'valor_numerico']
+    
+    # Resetear índice para evitar problemas
+    df_tabla = df_tabla.reset_index(drop=True)
+    
+    # 👉 ASEGURAR TIPO NUMÉRICO antes de calcular estadísticas
+    df_tabla['valor_numerico'] = pd.to_numeric(df_tabla['valor_numerico'], errors='coerce')
+    
+    # Calcular estadísticas para clasificación
+    promedio = df_tabla['valor_numerico'].mean()
+    desviacion = df_tabla['valor_numerico'].std()
+    
+    # 👉 VALIDACIÓN: Verificar que haya desviación estándar válida
+    if pd.isna(desviacion) or desviacion == 0:
+        st.warning("⚠️ Datos insuficientes para análisis estadístico")
+        df_mostrar = df_tabla.drop('valor_numerico', axis=1)
+        st.dataframe(df_mostrar, use_container_width=True, hide_index=True)
+        return
+    
+    # Eliminar columna ANTES de aplicar estilos
+    df_mostrar = df_tabla.drop('valor_numerico', axis=1).copy()
+    
+    # Función para aplicar colores según rendimiento
+    def aplicar_colores_rendimiento(row):
+        styles = []
+        # Obtener el valor numérico usando el índice de la fila
+        valor = df_tabla.loc[row.name, 'valor_numerico']
+        
+        # 👉 VALIDAR QUE EL VALOR NO SEA NaN
+        if pd.isna(valor):
+            # Color gris para valores sin datos
+            for col_name in df_mostrar.columns:
+                styles.append('background-color: #E0E0E0; color: #757575; padding: 12px;')
+            return styles
+        
+        # Clasificar en 3 categorías
+        if valor > promedio + (0.5 * desviacion):
+            bg_color = '#C8E6C9'  # Verde
+            text_color = '#1B5E20'
+        elif valor < promedio - (0.5 * desviacion):
+            bg_color = '#FFCDD2'  # Rojo
+            text_color = '#B71C1C'
+        else:
+            bg_color = '#FFF9C4'  # Amarillo
+            text_color = '#F57F17'
+        
+        # Aplicar el mismo color a todas las columnas
+        for col_name in df_mostrar.columns:
+            styles.append(f'background-color: {bg_color}; color: {text_color}; font-weight: bold; padding: 12px;')
+        
+        return styles
+    
+    # Aplicar estilos al dataframe sin la columna valor_numerico
+    styled_df = (
+        df_mostrar.style
+        .apply(aplicar_colores_rendimiento, axis=1)
+        .set_properties(**{
+            'text-align': 'center',
+            'font-family': 'Montserrat, Arial',
+            'font-size': '1em',
+            'border-radius': '8px',
+            'border': '1px solid #e1e1e1'
+        })
+        .set_table_styles([
+            {'selector': 'th', 'props': [
+                ('font-size', '1.1em'), 
+                ('text-align', 'center'), 
+                ('background-color', '#006B8F'), 
+                ('color', 'white'),
+                ('font-weight', 'bold'),
+                ('padding', '15px')
+            ]},
+            {'selector': 'td', 'props': [
+                ('text-align', 'center'), 
+                ('font-family', 'Montserrat, Arial'), 
+                ('font-size', '1em')
+            ]},
+            {'selector': 'tr:hover', 'props': [
+                ('opacity', '0.9'),
+                ('transform', 'scale(1.01)')
+            ]},
+            {'selector': 'table', 'props': [
+                ('border-radius', '8px'), 
+                ('border', '2px solid #006B8F'), 
+                ('background-color', '#fff'),
+                ('box-shadow', '0 4px 8px rgba(0, 0, 0, 0.1)')
+            ]}
+        ])
+    )
+
+    st.markdown("### 📋 Datos Filtrados y Clasificados")
+    
+    # Leyenda de colores
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("🟢 **Verde**: Por encima del promedio")
+    with col2:
+        st.markdown("🟡 **Amarillo**: En el promedio")
+    with col3:
+        st.markdown("🔴 **Rojo**: Por debajo del promedio")
+    
+    st.caption(f"📊 Promedio: {promedio:.2f} {unidad} | Desv. Est.: {desviacion:.2f} {unidad}")
+    
+    st.dataframe(styled_df, use_container_width=True, hide_index=True, height=600)
+
+def mostrar_grafico_top_bottom(df_filtrado, jugador_col, valor_col):
+    """
+    Crea visualización de alto impacto mostrando TOP 3 y BOTTOM 3 jugadores en contenedores separados
+    """
+    if df_filtrado.empty or len(df_filtrado) < 3:
+        st.warning("⚠️ Se necesitan al menos 3 registros para mostrar el gráfico comparativo")
+        return
+    
+    # Calcular promedio por jugador
+    df_promedio = df_filtrado.groupby(jugador_col)[valor_col].mean().reset_index()
+    df_promedio = df_promedio.sort_values(valor_col, ascending=False)
+    
+    # Obtener TOP 3 y BOTTOM 3
+    top_3 = df_promedio.head(3).copy()
+    bottom_3 = df_promedio.tail(3).copy()
+    
+    # Obtener nombre del test y unidad
+    nombre_test = df_filtrado['Test'].iloc[0] if 'Test' in df_filtrado.columns else "Test"
+    unidad = df_filtrado['unidad'].iloc[0] if 'unidad' in df_filtrado.columns else ""
+    
+    st.markdown(f"## Resultado de {nombre_test}")
+    
+    # Crear dos columnas principales
+    col_top, col_bottom = st.columns(2)
+    
+    # ============= CONTENEDOR TOP 3 =============
+    with col_top:
+        st.markdown(f"""
+            <div style='background: linear-gradient(135deg, #006B8F 0%, #004A6B 100%); 
+                        padding: 20px; 
+                        border-radius: 15px; 
+                        box-shadow: 0 8px 16px rgba(0, 74, 107, 0.5);
+                        margin-bottom: 20px;'>
+                <h2 style='color: white; text-align: center; margin: 0;'>
+                    🏆 LÍDERES DE RENDIMIENTO - {nombre_test.upper()}
+                </h2>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        for idx, (_, row) in enumerate(top_3.iterrows(), 1):
+            medalla = "🥇" if idx == 1 else "🥈" if idx == 2 else "🥉"
+            
+            st.markdown(f"""
+                <div style='background: linear-gradient(135deg, #B8E6D5 0%, #A2D5C6 100%);
+                            padding: 20px;
+                            border-radius: 12px;
+                            margin: 10px 0;
+                            border-left: 5px solid #006B8F;
+                            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);'>
+                    <div style='display: flex; justify-content: space-between; align-items: center;'>
+                        <div style='flex: 1;'>
+                            <h3 style='color: #004A6B; margin: 0 0 5px 0; font-size: 1.4em;'>
+                                {medalla} {row[jugador_col]}
+                            </h3>
+                            <p style='color: #2C3E50; margin: 0; font-size: 1.1em;'>
+                                📊 <strong>{nombre_test}</strong>
+                            </p>
+                        </div>
+                        <div style='text-align: right;'>
+                            <h2 style='color: #006B8F; margin: 0; font-size: 2.5em; font-weight: bold;'>
+                                {row[valor_col]:.10g} <span style='font-size: 0.6em;'>{unidad}</span>
+                            </h2>
+                            <p style='color: #005A75; margin: 0; font-size: 0.9em;'>
+                                ⚡ Excelente
+                            </p>
+                        </div>
+                    </div>    
+                </div>       
+            """, unsafe_allow_html=True)
+    
+    # ============= CONTENEDOR BOTTOM 3 =============
+    with col_bottom:
+        st.markdown(f"""
+            <div style='background: linear-gradient(135deg, #C0392B 0%, #922B21 100%); 
+                        padding: 20px; 
+                        border-radius: 15px; 
+                        box-shadow: 0 8px 16px rgba(146, 43, 33, 0.5);
+                        margin-bottom: 20px;'>
+                <h2 style='color: white; text-align: center; margin: 0;'>
+                    ⚠️ ZONA DE ALERTA - {nombre_test.upper()}
+                </h2>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        for idx, (_, row) in enumerate(bottom_3.iloc[::-1].iterrows(), 1):
+            emoji_alerta = "🔴" if idx == 1 else "🟠" if idx == 2 else "🟡"
+            
+            st.markdown(f"""
+                <div style='background: linear-gradient(135deg, #F5B7B1 0%, #E8AAAA 100%);
+                            padding: 20px;
+                            border-radius: 12px;
+                            margin: 10px 0;
+                            border-left: 5px solid #C0392B;
+                            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);'>
+                    <div style='display: flex; justify-content: space-between; align-items: center;'>
+                        <div style='flex: 1;'>
+                            <h3 style='color: #922B21; margin: 0 0 5px 0; font-size: 1.4em;'>
+                                {emoji_alerta} {row[jugador_col]}
+                            </h3>
+                            <p style='color: #2C3E50; margin: 0; font-size: 1.1em;'>
+                                📊 <strong>{nombre_test}</strong>
+                            </p>
+                        </div>
+                        <div style='text-align: right;'>
+                            <h2 style='color: #C0392B; margin: 0; font-size: 2.5em; font-weight: bold;'>
+                                {row[valor_col]:.10g} <span style='font-size: 0.6em;'>{unidad}</span>
+                            </h2>
+                            <p style='color: #A93226; margin: 0; font-size: 0.9em;'>
+                                💪 Mejorable
+                            </p>
+                        </div>
+                    </div>    
+                </div>        
+            """, unsafe_allow_html=True)
+
+
 def physical_area():
     # Header visual mejorado
     st.markdown("""
@@ -149,65 +394,106 @@ def physical_area():
     posicion_col = "Posición del jugador"
 
     st.markdown("### 🔎 Filtros Interactivos")
+    
+    # Definir grupos de posiciones DE RUGBY 🏉
+    FORWARDS = ["Pilar", "Hooker", "Segunda Línea", "Tercera Línea"]
+    BACKS = ["Medio Scrum", "Apertura", "Centro", "Wing","Fullback"]
+    
     filtros = {}
 
+    # 1️⃣ FILTRO: Categoría
     categorias = sorted(df[categoria_col].dropna().unique())
-    filtros["categoria"] = st.selectbox("Selecciona la categoría", options=categorias)
-
+    filtros["categoria"] = st.selectbox("📁 Selecciona la categoría", options=categorias)
     df_cat = df[df[categoria_col] == filtros["categoria"]]
+
+    # 2️⃣ FILTRO: Test físico
     tests = sorted(df_cat[test_col].dropna().unique())
-    filtros["test"] = st.selectbox("Selecciona el test físico", options=tests)
-
+    filtros["test"] = st.selectbox("🏃 Selecciona el test físico", options=tests)
     df_test = df_cat[df_cat[test_col] == filtros["test"]]
-    jugadores = sorted(df_test[jugador_col].dropna().unique())
-    filtros["jugador"] = st.multiselect("Selecciona jugador/es", options=jugadores)
 
-    df_jug = df_test[df_test[jugador_col].isin(filtros["jugador"])] if filtros["jugador"] else df_test
+
+
+    # 3️⃣ FILTRO: Grupo de posición (Forwards/Backs)
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        grupo_posicion = st.radio(
+            "⚡ Selecciona el grupo",
+            options=["Todos", "Forwards", "Backs"],
+            horizontal=True
+        )
+    
+    # Filtrar según grupo seleccionado
+    if grupo_posicion == "Forwards":
+        df_grupo = df_test[df_test[posicion_col].isin(FORWARDS)]
+    elif grupo_posicion == "Backs":
+        df_grupo = df_test[df_test[posicion_col].isin(BACKS)]
+    else:
+        df_grupo = df_test
+
+    # 4️⃣ FILTRO: Posición específica
+    with col2:
+        # Obtener posiciones que realmente existen en el dataframe filtrado
+        posiciones_en_df = df_grupo[posicion_col].dropna().unique()
+        
+        # Filtrar solo las posiciones del grupo seleccionado que existen en los datos
+        if grupo_posicion == "Forwards":
+            posiciones = sorted([p for p in FORWARDS if p in posiciones_en_df])
+        elif grupo_posicion == "Backs":
+            posiciones = sorted([p for p in BACKS if p in posiciones_en_df])
+        else:
+            posiciones = sorted(posiciones_en_df)
+        
+        filtros["posicion"] = st.selectbox(
+            "🎯 Selecciona la posición específica",
+            options=["Todas"] + posiciones
+        )
+    
+    # Aplicar filtro de posición
+    if filtros["posicion"] != "Todas":
+        df_pos = df_grupo[df_grupo[posicion_col] == filtros["posicion"]]
+    else:
+        df_pos = df_grupo
+
+    # 5️⃣ FILTRO: Jugador
+    jugadores = sorted(df_pos[jugador_col].dropna().unique())
+    
+    # Mostrar cantidad de jugadores disponibles
+    st.caption(f"🔍 {len(jugadores)} jugadores disponibles en esta selección")
+    
+    filtros["jugador"] = st.multiselect(
+        "👤 Selecciona jugador/es",
+        options=jugadores,
+        default=[],
+        help="Puedes seleccionar múltiples jugadores para comparar"
+    )
+
+    # Aplicar filtro de jugador solo si se seleccionó alguno
+    if filtros["jugador"]:
+        df_jug = df_pos[df_pos[jugador_col].isin(filtros["jugador"])]
+    else:
+        df_jug = df_pos
+
+    # 6️⃣ FILTRO: Subtest
     subtests = sorted(df_jug[subtest_col].dropna().unique())
-    filtros["subtest"] = st.selectbox("Selecciona el subtest", options=subtests)
+    if len(subtests) > 1:
+        filtros["subtest"] = st.selectbox("⚙️ Selecciona el subtest", options=["Todos"] + subtests)
+        if filtros["subtest"] != "Todos":
+            df_filtrado = df_jug[df_jug[subtest_col] == filtros["subtest"]]
+        else:
+            df_filtrado = df_jug
+    else:
+        df_filtrado = df_jug
 
-    df_filtrado = df_jug[df_jug[subtest_col] == filtros["subtest"]]
-
+      # Convertir valores
     df_filtrado[valor_col] = df_filtrado[valor_col].astype(str).str.replace(',', '.')
     df_filtrado[valor_col] = pd.to_numeric(df_filtrado[valor_col], errors='coerce')
 
+    # Espacio visual entre filtros y resultados
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    mostrar_grafico_top_bottom(df_filtrado, jugador_col, valor_col)
+
+    st.markdown("---")
+    
+    
     mostrar_tabla_estilizada(df_filtrado, valor_col, test_col, subtest_col)
-
-def mostrar_tabla_estilizada(df, valor_col, test_col, subtest_col):
-    # Aplica gradiente en columna "valor"
-    styled_df = (
-        df.style
-        .background_gradient(subset=[valor_col], cmap='Blues')
-        .set_properties(**{
-            'text-align': 'center',
-            'font-family': 'Montserrat, Arial',
-            'font-size': '1em',
-            'border-radius': '8px',
-            'border': '1px solid #e1e1e1'
-        })
-        .set_table_styles([
-            {'selector': 'th', 'props': [('font-size', '1.1em'), ('text-align', 'center'), ('background-color', '#eaf6fb'), ('color', '#2E86C1')]},
-            {'selector': 'td', 'props': [('text-align', 'center'), ('font-family', 'Montserrat, Arial'), ('font-size', '1em')]},
-            {'selector': 'table', 'props': [('border-radius', '8px'), ('border', '1px solid #e1e1e1'), ('background-color', '#fff')]}
-        ])
-    )
-
-    st.markdown("### 📋 Datos filtrados y estilizados:")
-    st.dataframe(styled_df, use_container_width=True)
-    # Aplica gradiente en columna "valor"
-    styled_df = (
-        df.style
-        .background_gradient(subset=[valor_col], cmap='Blues')
-        .set_properties(**{
-            'text-align': 'center',
-            'font-family': 'Montserrat, Arial',
-            'font-size': '1em',
-            'border-radius': '8px',
-            'border': '1px solid #e1e1e1'
-        })
-        .set_table_styles([
-            {'selector': 'th', 'props': [('font-size', '1.1em'), ('text-align', 'center'), ('background-color', '#eaf6fb'), ('color', '#2E86C1')]},
-            {'selector': 'td', 'props': [('text-align', 'center'), ('font-family', 'Montserrat, Arial'), ('font-size', '1em')]},
-            {'selector': 'table', 'props': [('border-radius', '8px'), ('border', '1px solid #e1e1e1'), ('background-color', '#fff')]}
-        ])
-    )

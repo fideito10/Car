@@ -84,9 +84,9 @@ def conectar_base_central():
                 'nombre': nombre,
                 'dni': str(registro.get('DNI', registro.get('dni', ''))).strip(),
                 'categoria': registro.get('Categoria', registro.get('categoria', registro.get('División', 'Sin Categoría'))).strip(),
-                'posicion': registro.get('Posición', registro.get('posicion', '')).strip(),
+                'posicion': registro.get('Posicion', registro.get('Posición', registro.get('posicion', ''))).strip(),  # 👈 AGREGADO 'Posicion' sin tilde
                 'estado': registro.get('Estado', registro.get('estado', 'Activo')).strip(),
-                'telefono': registro.get('Teléfono', registro.get('telefono', '')).strip(),
+                'telefono': registro.get('Telefono', registro.get('Teléfono', registro.get('telefono', ''))).strip(),  # 👈 AGREGADO 'Telefono' sin tilde
                 'email': registro.get('Email', registro.get('email', '')).strip()
             }
             if jugador['nombre'] and jugador['dni']:
@@ -552,8 +552,18 @@ def main_reporte_medico():
             for i, registro in enumerate(historial_medico[:3]):
                 fecha = registro.get('Fecha de Atención', registro.get('Marca temporal', 'Sin fecha'))
                 diagnostico = registro.get('Tipo de Lesión', 'Sin diagnóstico')
-                with st.expander(f"📄 {i+1}. {fecha} - {diagnostico}", expanded=(i==0)):
-                    st.markdown(f"<h3 style='margin-bottom:0.5rem;'>{i+1}. {fecha} - {diagnostico}</h3>", unsafe_allow_html=True)
+                severidad = registro.get('Severidad de la Lesión', 'No especificada')
+                
+                # 🎨 TÍTULO MEJORADO CON ÍCONOS Y COLOR SEGÚN SEVERIDAD
+                icono_severidad = {
+                    'Leve': '🟢',
+                    'Moderada': '🟡', 
+                    'Grave': '🔴'
+                }.get(severidad, '⚪')
+                
+                titulo_expander = f"{icono_severidad} **{fecha}** • {diagnostico} • *{severidad}*"
+                
+                with st.expander(titulo_expander, expanded=(i==0)):
                     col_det1, col_det2 = st.columns(2)
                     with col_det1:
                         st.markdown(f"""
