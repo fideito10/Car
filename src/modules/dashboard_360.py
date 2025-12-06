@@ -41,15 +41,7 @@ def validar_credenciales():
     
     for cred_path in possible_paths:
         if os.path.exists(cred_path):
-            st.success
-            return True
-    
-    st.error("❌ No se encontraron credenciales de Google Sheets")
-    st.info("""
-    **Coloca el archivo de credenciales en:**
-    - `credentials/service-account-key.json`
-    - O en la carpeta padre: `../credentials/service-account-key.json`
-    """)
+            return True  # 👈 Solo retornar True, sin mostrar mensaje
     return False
 
 # ...existing code...
