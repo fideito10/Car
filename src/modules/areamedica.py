@@ -497,9 +497,434 @@ def mostrar_estadisticas_avanzadas(df):
                     st.write(f"🏈 {division}: {cantidad} ({porcentaje:.1f}%)")
 
 
+def mostrar_dashboard_tendencias_lesiones(df):
+    """
+    Dashboard completo para análisis de tendencias de lesiones
+    Objetivo: Identificar partes del cuerpo y tipos de lesiones más frecuentes
+    """
+    st.markdown("---")
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%); padding: 1.5rem; border-radius: 10px; margin: 1rem 0;">
+        <h2 style="color: white; text-align: center; margin: 0;">🔬 Análisis de Tendencias de Lesiones</h2>
+        <p style="color: rgba(255,255,255,0.9); text-align: center; margin: 0.5rem 0 0 0;">Identificación de patrones y zonas críticas</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # ============================================
+    # SECCIÓN 1: FILTROS AVANZADOS
+    # ============================================
+    st.markdown("### 🎯 Filtros de Análisis")
+    
+    col_filtro1, col_filtro2, col_filtro3 = st.columns(3)
+    
+    with col_filtro1:
+        # Filtro de Fechas
+        if 'Fecha' in df.columns:
+            df['Fecha_parsed'] = pd.to_datetime(df['Fecha'], errors='coerce')
+            fechas_validas = df['Fecha_parsed'].dropna()
+            
+            if not fechas_validas.empty:
+                fecha_min = fechas_validas.min().date()
+                fecha_max = fechas_validas.max().date()
+                
+                rango_fechas = st.date_input(
+                    "📅 Rango de Fechas",
+                    value=(fecha_min, fecha_max),
+                    min_value=fecha_min,
+                    max_value=fecha_max,
+                    key="tendencias_fecha"
+                )
+            else:
+                rango_fechas = None
+        else:
+            rango_fechas = None
+            st.warning("⚠️ No hay columna de fechas")
+    
+    with col_filtro2:
+        # Filtro de Categoría
+        if 'Categoría' in df.columns:
+            categorias = ['Todas'] + sorted(df['Categoría'].dropna().unique().tolist())
+            cat_seleccionada = st.selectbox(
+                "🏈 División",
+                categorias,
+                key="tendencias_categoria"
+            )
+        else:
+            cat_seleccionada = 'Todas'
+    
+    with col_filtro3:
+        # Filtro de Parte del Cuerpo (NUEVA FUNCIONALIDAD)
+        # Buscar posibles columnas que contengan partes del cuerpo
+        posibles_columnas_parte = [col for col in df.columns if 'parte' in col.lower() or 'cuerpo' in col.lower() or 'zona' in col.lower()]
+        
+        if posibles_columnas_parte:
+            col_parte = posibles_columnas_parte[0]
+            partes = ['Todas'] + sorted(df[col_parte].dropna().unique().tolist())
+            parte_seleccionada = st.selectbox(
+                "🎯 Parte del Cuerpo",
+                partes,
+                key="tendencias_parte"
+            )
+        else:
+            parte_seleccionada = 'Todas'
+            st.info("💡 Agrega columna 'Parte Afectada' en el Sheet")
+    
+    # ============================================
+    # APLICAR FILTROS
+    # ============================================
+    df_analisis = df.copy()
+    
+    # Filtro de fechas
+    if rango_fechas and len(rango_fechas) == 2:
+        fecha_inicio, fecha_fin = rango_fechas
+        df_analisis = df_analisis[
+            (df_analisis['Fecha_parsed'].dt.date >= fecha_inicio) & 
+            (df_analisis['Fecha_parsed'].dt.date <= fecha_fin)
+        ]
+    
+    # Filtro de categoría
+    if cat_seleccionada != 'Todas' and 'Categoría' in df.columns:
+        df_analisis = df_analisis[df_analisis['Categoría'] == cat_seleccionada]
+    
+    # Filtro de parte del cuerpo
+    if parte_seleccionada != 'Todas' and posibles_columnas_parte:
+        df_analisis = df_analisis[df_analisis[col_parte] == parte_seleccionada]
+    
+    # Mostrar info de filtros
+    if not df_analisis.empty:
+        st.success(f"✅ **{len(df_analisis)} lesiones** en el período seleccionado")
+    else:
+        st.warning("⚠️ No hay datos con los filtros seleccionados")
+        return
+    
+    st.markdown("---")
+    
+    # ============================================
+    # SECCIÓN 2: MÉTRICAS PRINCIPALES
+    # ============================================
+    st.markdown("### 📊 Resumen Ejecutivo")
+    
+    col_met1, col_met2, col_met3, col_met4 = st.columns(4)
+    
+    with col_met1:
+        total_lesiones = len(df_analisis)
+        st.metric(
+            "📋 Total Lesiones",
+            total_lesiones,
+            delta=None
+        )
+    
+    with col_met2:
+        # Parte del cuerpo más afectada
+        if posibles_columnas_parte and col_parte in df_analisis.columns:
+            parte_mas_comun = df_analisis[col_parte].mode()
+            if not parte_mas_comun.empty:
+                parte_top = parte_mas_comun.iloc[0]
+                cantidad_parte = len(df_analisis[df_analisis[col_parte] == parte_top])
+                st.metric(
+                    "🎯 Zona Crítica",
+                    parte_top,
+                    delta=f"{cantidad_parte} casos"
+                )
+            else:
+                st.metric("🎯 Zona Crítica", "N/A")
+        else:
+            st.metric("🎯 Zona Crítica", "Sin datos")
+    
+    with col_met3:
+        # Gravedad predominante
+        if 'Severidad de la Lesión' in df_analisis.columns:
+            severidad_top = df_analisis['Severidad de la Lesión'].mode()
+            if not severidad_top.empty:
+                st.metric(
+                    "⚠️ Severidad Predominante",
+                    severidad_top.iloc[0]
+                )
+            else:
+                st.metric("⚠️ Severidad Predominante", "N/A")
+        else:
+            st.metric("⚠️ Severidad Predominante", "Sin datos")
+    
+    with col_met4:
+        # Promedio lesiones por mes
+        if 'Fecha_parsed' in df_analisis.columns:
+            meses_unicos = df_analisis['Fecha_parsed'].dt.to_period('M').nunique()
+            if meses_unicos > 0:
+                promedio_mes = total_lesiones / meses_unicos
+                st.metric(
+                    "📈 Promedio Mensual",
+                    f"{promedio_mes:.1f}",
+                    delta=None
+                )
+            else:
+                st.metric("📈 Promedio Mensual", "N/A")
+        else:
+            st.metric("📈 Promedio Mensual", "Sin datos")
+    
+    st.markdown("---")
+    
+    # ============================================
+    # SECCIÓN 3: GRÁFICOS PRINCIPALES
+    # ============================================
+    st.markdown("### 📊 Análisis Visual de Tendencias")
+    
+    # FILA 1: TOP 5 LESIONES + EVOLUCIÓN TEMPORAL
+    col_graf1, col_graf2 = st.columns([1, 1.5])
+    
+    with col_graf1:
+        st.markdown("#### 🏆 Top 5 Partes del Cuerpo Más Afectadas")
+        
+        if posibles_columnas_parte and col_parte in df_analisis.columns:
+            top_partes = df_analisis[col_parte].value_counts().head(5)
+            
+            if not top_partes.empty:
+                fig_top = px.bar(
+                    x=top_partes.values,
+                    y=top_partes.index,
+                    orientation='h',
+                    color=top_partes.values,
+                    color_continuous_scale='Reds',
+                    labels={'x': 'Cantidad', 'y': 'Parte del Cuerpo'}
+                )
+                
+                fig_top.update_layout(
+                    height=400,
+                    showlegend=False,
+                    coloraxis_showscale=False
+                )
+                
+                st.plotly_chart(fig_top, use_container_width=True)
+                
+                # Mostrar tabla de top 5
+                st.markdown("**Detalle:**")
+                for i, (parte, cantidad) in enumerate(top_partes.items(), 1):
+                    porcentaje = (cantidad / total_lesiones) * 100
+                    emoji = "🔴" if i == 1 else "🟠" if i == 2 else "🟡"
+                    st.write(f"{emoji} **{i}. {parte}:** {cantidad} casos ({porcentaje:.1f}%)")
+            else:
+                st.info("No hay datos de partes del cuerpo")
+        else:
+            st.warning("⚠️ Agrega columna 'Parte Afectada' en Google Sheets para ver este análisis")
+            st.info("""
+            💡 **Sugerencia:** Crea una columna llamada:
+            - `Parte Afectada` o
+            - `Zona del Cuerpo` o
+            - `Parte del Cuerpo`
+            
+            Con valores como: Rodilla, Tobillo, Isquiotibiales, etc.
+            """)
+    
+    with col_graf2:
+        st.markdown("#### 📈 Evolución Temporal de Lesiones")
+        
+        if 'Fecha_parsed' in df_analisis.columns:
+            df_timeline = df_analisis.copy()
+            df_timeline['Mes'] = df_timeline['Fecha_parsed'].dt.to_period('M').astype(str)
+            
+            lesiones_por_mes = df_timeline.groupby('Mes').size().reset_index(name='Cantidad')
+            
+            if not lesiones_por_mes.empty:
+                fig_timeline = px.line(
+                    lesiones_por_mes,
+                    x='Mes',
+                    y='Cantidad',
+                    markers=True,
+                    labels={'Mes': 'Período', 'Cantidad': 'Número de Lesiones'}
+                )
+                
+                fig_timeline.update_traces(
+                    line_color='#dc2626',
+                    marker=dict(size=10, color='#ef4444'),
+                    fill='tozeroy',
+                    fillcolor='rgba(220, 38, 38, 0.1)'
+                )
+                
+                fig_timeline.update_layout(
+                    height=400,
+                    hovermode='x unified'
+                )
+                
+                st.plotly_chart(fig_timeline, use_container_width=True)
+                
+                # Detectar picos
+                if len(lesiones_por_mes) > 1:
+                    max_mes = lesiones_por_mes.loc[lesiones_por_mes['Cantidad'].idxmax()]
+                    st.warning(f"⚠️ **Pico detectado:** {max_mes['Mes']} con {max_mes['Cantidad']} lesiones")
+            else:
+                st.info("No hay suficientes datos temporales")
+        else:
+            st.info("No hay datos de fechas")
+    
+    st.markdown("---")
+    
+    # FILA 2: TIPOS DE LESIÓN + DISTRIBUCIÓN POR CATEGORÍA
+    col_graf3, col_graf4 = st.columns(2)
+    
+    with col_graf3:
+        st.markdown("#### 🏥 Tipos de Lesión Más Frecuentes")
+        
+        # Buscar columna de tipo de lesión
+        posibles_columnas_tipo = [col for col in df.columns if 'tipo' in col.lower() or 'diagnóstico' in col.lower()]
+        
+        if posibles_columnas_tipo:
+            col_tipo = posibles_columnas_tipo[0]
+            tipos_lesion = df_analisis[col_tipo].value_counts().head(5)
+            
+            if not tipos_lesion.empty:
+                fig_tipos = px.bar(
+                    x=tipos_lesion.index,
+                    y=tipos_lesion.values,
+                    color=tipos_lesion.values,
+                    color_continuous_scale='Oranges',
+                    labels={'x': 'Tipo de Lesión', 'y': 'Cantidad'}
+                )
+                
+                fig_tipos.update_layout(
+                    height=400,
+                    showlegend=False,
+                    coloraxis_showscale=False
+                )
+                
+                st.plotly_chart(fig_tipos, use_container_width=True)
+            else:
+                st.info("No hay datos de tipos de lesión")
+        else:
+            st.warning("⚠️ Agrega columna 'Tipo de Lesión' en Google Sheets")
+            st.info("""
+            💡 **Sugerencia:** Crea una columna llamada:
+            - `Tipo de Lesión` o
+            - `Diagnóstico`
+            
+            Con valores como: Esguince, Desgarro, Fractura, Contractura, etc.
+            """)
+    
+    with col_graf4:
+        st.markdown("#### 🏈 Distribución por Categoría")
+        
+        if 'Categoría' in df_analisis.columns:
+            categorias_dist = df_analisis['Categoría'].value_counts()
+            
+            if not categorias_dist.empty:
+                fig_cat = px.pie(
+                    values=categorias_dist.values,
+                    names=categorias_dist.index,
+                    color_discrete_sequence=px.colors.sequential.Blues_r,
+                    hole=0.4
+                )
+                
+                fig_cat.update_traces(
+                    textposition='inside',
+                    textinfo='percent+label'
+                )
+                
+                fig_cat.update_layout(height=400)
+                
+                st.plotly_chart(fig_cat, use_container_width=True)
+            else:
+                st.info("No hay datos de categorías")
+        else:
+            st.info("No hay datos de categorías")
+    
+    st.markdown("---")
+    
+    # ============================================
+    # SECCIÓN 4: ALERTAS Y RECOMENDACIONES
+    # ============================================
+    st.markdown("### 🚨 Alertas y Recomendaciones")
+    
+    col_alert1, col_alert2 = st.columns(2)
+    
+    with col_alert1:
+        st.markdown("#### ⚠️ Zonas de Alto Riesgo")
+        
+        if posibles_columnas_parte and col_parte in df_analisis.columns:
+            partes_criticas = df_analisis[col_parte].value_counts().head(3)
+            
+            for i, (parte, cantidad) in enumerate(partes_criticas.items(), 1):
+                porcentaje = (cantidad / total_lesiones) * 100
+                
+                if porcentaje > 30:
+                    nivel = "🔴 CRÍTICO"
+                    color = "error"
+                elif porcentaje > 20:
+                    nivel = "🟠 ALTO"
+                    color = "warning"
+                else:
+                    nivel = "🟡 MODERADO"
+                    color = "info"
+                
+                st.markdown(f"""
+                **{i}. {parte}**  
+                - {cantidad} casos ({porcentaje:.1f}%)  
+                - Nivel: {nivel}
+                """)
+                
+                if porcentaje > 25:
+                    st.error(f"💡 **Recomendación:** Implementar trabajo preventivo específico para {parte}")
+        else:
+            st.info("Agrega datos de partes del cuerpo para ver alertas")
+    
+    with col_alert2:
+        st.markdown("#### 📊 Tendencias Temporales")
+        
+        if 'Fecha_parsed' in df_analisis.columns and len(df_analisis) > 5:
+            # Comparar último mes vs promedio
+            df_analisis['Mes_Num'] = df_analisis['Fecha_parsed'].dt.to_period('M')
+            lesiones_por_mes_num = df_analisis.groupby('Mes_Num').size()
+            
+            if len(lesiones_por_mes_num) >= 2:
+                ultimo_mes = lesiones_por_mes_num.iloc[-1]
+                promedio_historico = lesiones_por_mes_num.iloc[:-1].mean()
+                
+                diferencia_porcentual = ((ultimo_mes - promedio_historico) / promedio_historico) * 100
+                
+                st.metric(
+                    "📈 Último Mes vs Promedio",
+                    f"{ultimo_mes} lesiones",
+                    delta=f"{diferencia_porcentual:+.1f}%"
+                )
+                
+                if diferencia_porcentual > 50:
+                    st.error(f"🚨 **ALERTA:** Incremento significativo del {diferencia_porcentual:.0f}% en lesiones")
+                    st.warning("💡 **Acción requerida:** Revisar cargas de entrenamiento y protocolos de prevención")
+                elif diferencia_porcentual > 20:
+                    st.warning(f"⚠️ Aumento moderado del {diferencia_porcentual:.0f}% en lesiones")
+                elif diferencia_porcentual < -20:
+                    st.success(f"✅ Reducción del {abs(diferencia_porcentual):.0f}% en lesiones")
+                else:
+                    st.info("📊 Nivel de lesiones estable")
+            else:
+                st.info("Necesitas más datos históricos para análisis de tendencias")
+        else:
+            st.info("Agrega más datos para análisis de tendencias")
+    
+    st.markdown("---")
+    
+    # ============================================
+    # SECCIÓN 5: TABLA DETALLADA
+    # ============================================
+    st.markdown("### 📋 Detalle de Lesiones")
+    
+    with st.expander("📊 Ver tabla completa de datos", expanded=False):
+        st.dataframe(df_analisis, use_container_width=True, height=400)
+        
+        # Botón de descarga
+        csv = df_analisis.to_csv(index=False)
+        st.download_button(
+            label="📥 Descargar análisis completo (CSV)",
+            data=csv,
+            file_name=f"analisis_tendencias_lesiones_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
+
+
+# ============================================
+# MODIFICAR LA FUNCIÓN MAIN PARA INCLUIR EL NUEVO DASHBOARD
+# ============================================
+
 def main_streamlit():
     """
-    INTERFAZ PRINCIPAL - ÚNICA FUNCIÓN MAIN
+    INTERFAZ PRINCIPAL CON DASHBOARD DE TENDENCIAS
     """
     # Header
     st.markdown("""
@@ -515,181 +940,181 @@ def main_streamlit():
             df = create_dataframe_from_sheet()
             
             if df is not None and not df.empty:
-                # NOMBRES DE COLUMNAS CORRECTOS
-                col_categoria = 'Categoría'
-                col_severidad = 'Severidad de la Lesión'  # 👈 CORREGIDO: Mayúscula en Lesión
+                # ============================================
+                # TABS PARA ORGANIZAR EL DASHBOARD
+                # ============================================
+                tab1, tab2 = st.tabs(["📊 Dashboard General", "🔬 Análisis de Tendencias"])
                 
-                # FILTROS EN FILA HORIZONTAL
-                st.markdown("### 🔍 Filtros")
-                col_filtro1, col_filtro2 = st.columns(2)
-                
-                with col_filtro1:
-                    # Filtro de Categoría
-                    if col_categoria in df.columns:
-                        categorias_disponibles = ['Todas'] + sorted(df[col_categoria].dropna().unique().tolist())
-                        categoria_seleccionada = st.selectbox(
-                            "🏈 Seleccionar División",
-                            categorias_disponibles,
-                            key="area_medica_filtro_categoria"
-                        )
-                    else:
-                        categoria_seleccionada = 'Todas'
-                
-                with col_filtro2:
-                    # Filtro de Gravedad
-                    if col_severidad in df.columns:
-                        gravedades_disponibles = ['Todas'] + sorted(df[col_severidad].dropna().unique().tolist())
-                        gravedad_seleccionada = st.selectbox(
-                            "⚠️ Seleccionar Gravedad",
-                            gravedades_disponibles,
-                            key="area_medica_filtro_gravedad"
-                        )
-                    else:
-                        gravedad_seleccionada = 'Todas'
-                
-                # Aplicar filtros al DataFrame
-                df_filtrado = df.copy()
-                
-                if categoria_seleccionada != 'Todas' and col_categoria in df.columns:
-                    df_filtrado = df_filtrado[df_filtrado[col_categoria] == categoria_seleccionada]
-                
-                if gravedad_seleccionada != 'Todas' and col_severidad in df.columns:
-                    df_filtrado = df_filtrado[df_filtrado[col_severidad] == gravedad_seleccionada]
-                
-                # Mostrar información de filtros aplicados
-                info_filtros = []
-                if categoria_seleccionada != 'Todas':
-                    info_filtros.append(f"**División:** {categoria_seleccionada}")
-                if gravedad_seleccionada != 'Todas':
-                    info_filtros.append(f"**Gravedad:** {gravedad_seleccionada}")
-                
-                if info_filtros:
-                    st.info(f"🔍 **Filtros activos:** {' | '.join(info_filtros)}")
-                
-                st.markdown("---")
-                
-                # GRÁFICOS EN FILA HORIZONTAL
-                st.markdown("### 📊 Análisis de Lesiones")
-                col_grafico1, col_grafico2 = st.columns(2)
-                
-                with col_grafico1:
-                    # Gráfico por Categoría
-                    st.markdown("#### 📊 Lesiones por División")
-                    if col_categoria in df_filtrado.columns and not df_filtrado.empty:
-                        categorias_counts = df_filtrado[col_categoria].value_counts()
-                        
-                        fig_bar = px.bar(
-                            x=categorias_counts.index,
-                            y=categorias_counts.values,
-                            color_discrete_sequence=['#1e40af', '#2563eb', '#3b82f6', '#60a5fa']
-                        )
-                        
-                        fig_bar.update_layout(
-                            showlegend=False,
-                            xaxis_title="División",
-                            yaxis_title="Cantidad",
-                            height=400
-                        )
-                        
-                        st.plotly_chart(fig_bar, use_container_width=True)
-                    else:
-                        st.info("No hay datos para mostrar")
-                
-                with col_grafico2:
-                    # Gráfico de Torta por Gravedad
-                    st.markdown("#### 🎯 Jugadores por Gravedad")
-                    if col_severidad in df_filtrado.columns and not df_filtrado.empty:
-                        # Limpiar y filtrar datos vacíos
-                        df_severidad = df_filtrado[df_filtrado[col_severidad].notna() & (df_filtrado[col_severidad] != '')]
-                        
-                        if not df_severidad.empty:
-                            severidad_counts = df_severidad[col_severidad].value_counts()
+                with tab1:
+                    # CÓDIGO EXISTENTE DEL DASHBOARD GENERAL
+                    # (Todo el código que ya tenías)
+                    
+                    col_categoria = 'Categoría'
+                    col_severidad = 'Severidad de la Lesión'
+                    
+                    st.markdown("### 🔍 Filtros")
+                    col_filtro1, col_filtro2 = st.columns(2)
+                    
+                    with col_filtro1:
+                        if col_categoria in df.columns:
+                            categorias_disponibles = ['Todas'] + sorted(df[col_categoria].dropna().unique().tolist())
+                            categoria_seleccionada = st.selectbox(
+                                "🏈 Seleccionar División",
+                                categorias_disponibles,
+                                key="area_medica_filtro_categoria"
+                            )
+                        else:
+                            categoria_seleccionada = 'Todas'
+                    
+                    with col_filtro2:
+                        if col_severidad in df.columns:
+                            gravedades_disponibles = ['Todas'] + sorted(df[col_severidad].dropna().unique().tolist())
+                            gravedad_seleccionada = st.selectbox(
+                                "⚠️ Seleccionar Gravedad",
+                                gravedades_disponibles,
+                                key="area_medica_filtro_gravedad"
+                            )
+                        else:
+                            gravedad_seleccionada = 'Todas'
+                    
+                    df_filtrado = df.copy()
+                    
+                    if categoria_seleccionada != 'Todas' and col_categoria in df.columns:
+                        df_filtrado = df_filtrado[df_filtrado[col_categoria] == categoria_seleccionada]
+                    
+                    if gravedad_seleccionada != 'Todas' and col_severidad in df.columns:
+                        df_filtrado = df_filtrado[df_filtrado[col_severidad] == gravedad_seleccionada]
+                    
+                    info_filtros = []
+                    if categoria_seleccionada != 'Todas':
+                        info_filtros.append(f"**División:** {categoria_seleccionada}")
+                    if gravedad_seleccionada != 'Todas':
+                        info_filtros.append(f"**Gravedad:** {gravedad_seleccionada}")
+                    
+                    if info_filtros:
+                        st.info(f"🔍 **Filtros activos:** {' | '.join(info_filtros)}")
+                    
+                    st.markdown("---")
+                    
+                    st.markdown("### 📊 Análisis de Lesiones")
+                    col_grafico1, col_grafico2 = st.columns(2)
+                    
+                    with col_grafico1:
+                        st.markdown("#### 📊 Lesiones por División")
+                        if col_categoria in df_filtrado.columns and not df_filtrado.empty:
+                            categorias_counts = df_filtrado[col_categoria].value_counts()
                             
-                            fig_pie = px.pie(
-                                values=severidad_counts.values,
-                                names=severidad_counts.index,
-                                color_discrete_sequence=['#22c55e', '#eab308', '#ef4444', '#dc2626'],
-                                hole=0.3
+                            fig_bar = px.bar(
+                                x=categorias_counts.index,
+                                y=categorias_counts.values,
+                                color_discrete_sequence=['#1e40af', '#2563eb', '#3b82f6', '#60a5fa']
                             )
                             
-                            fig_pie.update_traces(
-                                textposition='inside',
-                                textinfo='percent+label'
+                            fig_bar.update_layout(
+                                showlegend=False,
+                                xaxis_title="División",
+                                yaxis_title="Cantidad",
+                                height=400
                             )
                             
-                            fig_pie.update_layout(
-                                height=400,
-                                showlegend=True,
-                                legend=dict(
-                                    orientation="v",
-                                    yanchor="middle",
-                                    y=0.5,
-                                    xanchor="left",
-                                    x=1.02
+                            st.plotly_chart(fig_bar, use_container_width=True)
+                        else:
+                            st.info("No hay datos para mostrar")
+                    
+                    with col_grafico2:
+                        st.markdown("#### 🎯 Jugadores por Gravedad")
+                        if col_severidad in df_filtrado.columns and not df_filtrado.empty:
+                            df_severidad = df_filtrado[df_filtrado[col_severidad].notna() & (df_filtrado[col_severidad] != '')]
+                            
+                            if not df_severidad.empty:
+                                severidad_counts = df_severidad[col_severidad].value_counts()
+                                
+                                fig_pie = px.pie(
+                                    values=severidad_counts.values,
+                                    names=severidad_counts.index,
+                                    color_discrete_sequence=['#22c55e', '#eab308', '#ef4444', '#dc2626'],
+                                    hole=0.3
                                 )
-                            )
-                            
-                            st.plotly_chart(fig_pie, use_container_width=True)
-                        else:
-                            # Mensaje cuando no hay datos
-                            if categoria_seleccionada != 'Todas':
-                                st.warning(f"⚠️ No hay datos de gravedad para **{categoria_seleccionada}**")
-                                st.info("💡 Verifica que la columna tenga valores en tu Google Sheet")
+                                
+                                fig_pie.update_traces(
+                                    textposition='inside',
+                                    textinfo='percent+label'
+                                )
+                                
+                                fig_pie.update_layout(
+                                    height=400,
+                                    showlegend=True,
+                                    legend=dict(
+                                        orientation="v",
+                                        yanchor="middle",
+                                        y=0.5,
+                                        xanchor="left",
+                                        x=1.02
+                                    )
+                                )
+                                
+                                st.plotly_chart(fig_pie, use_container_width=True)
                             else:
-                                st.warning("⚠️ No hay datos de gravedad disponibles")
+                                if categoria_seleccionada != 'Todas':
+                                    st.warning(f"⚠️ No hay datos de gravedad para **{categoria_seleccionada}**")
+                                else:
+                                    st.warning("⚠️ No hay datos de gravedad disponibles")
+                        else:
+                            st.info("No hay datos para mostrar")
+                    
+                    st.markdown("---")
+                    
+                    st.markdown("### 👥 Lesionados")
+                    
+                    if not df_filtrado.empty:
+                        st.success(f"✅ **{len(df_filtrado)} lesionado(s) encontrado(s)**")
+                        
+                        col_met1, col_met2, col_met3, col_met4 = st.columns(4)
+                        with col_met1:
+                            st.metric("📋 Total Lesiones", len(df_filtrado))
+                        with col_met2:
+                            if col_severidad in df_filtrado.columns:
+                                leves = len(df_filtrado[df_filtrado[col_severidad].str.contains('Leve', case=False, na=False)])
+                                st.metric("🟢 Leves", leves)
+                            else:
+                                st.metric("🟢 Leves", "N/A")
+                        with col_met3:
+                            if col_severidad in df_filtrado.columns:
+                                moderadas = len(df_filtrado[df_filtrado[col_severidad].str.contains('Moderada', case=False, na=False)])
+                                st.metric("🟡 Moderadas", moderadas)
+                            else:
+                                st.metric("🟡 Moderadas", "N/A")
+                        with col_met4:
+                            if col_severidad in df_filtrado.columns:
+                                graves = len(df_filtrado[df_filtrado[col_severidad].str.contains('Grave', case=False, na=False)])
+                                st.metric("🔴 Graves", graves)
+                            else:
+                                st.metric("🔴 Graves", "N/A")
+                        
+                        st.dataframe(df_filtrado, use_container_width=True, height=400)
+                        
+                        csv = df_filtrado.to_csv(index=False)
+                        st.download_button(
+                            label="📥 Descargar datos filtrados",
+                            data=csv,
+                            file_name=f"lesiones_filtradas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                            mime="text/csv"
+                        )
                     else:
-                        st.info("No hay datos para mostrar")
+                        st.warning("⚠️ No se encontraron registros con los filtros seleccionados")
                 
-                st.markdown("---")
-                
-                # TABLA DE LESIONADOS
-                st.markdown("### 👥 Lesionados")
-                
-                if not df_filtrado.empty:
-                    st.success(f"✅ **{len(df_filtrado)} lesionado(s) encontrado(s)**")
-                    
-                    # Mostrar métricas resumidas
-                    col_met1, col_met2, col_met3, col_met4 = st.columns(4)
-                    with col_met1:
-                        st.metric("📋 Total Lesiones", len(df_filtrado))
-                    with col_met2:
-                        if col_severidad in df_filtrado.columns:
-                            leves = len(df_filtrado[df_filtrado[col_severidad].str.contains('Leve', case=False, na=False)])
-                            st.metric("🟢 Leves", leves)
-                        else:
-                            st.metric("🟢 Leves", "N/A")
-                    with col_met3:
-                        if col_severidad in df_filtrado.columns:
-                            moderadas = len(df_filtrado[df_filtrado[col_severidad].str.contains('Moderada', case=False, na=False)])
-                            st.metric("🟡 Moderadas", moderadas)
-                        else:
-                            st.metric("🟡 Moderadas", "N/A")
-                    with col_met4:
-                        if col_severidad in df_filtrado.columns:
-                            graves = len(df_filtrado[df_filtrado[col_severidad].str.contains('Grave', case=False, na=False)])
-                            st.metric("🔴 Graves", graves)
-                        else:
-                            st.metric("🔴 Graves", "N/A")
-                    
-                    # Tabla de datos
-                    st.dataframe(df_filtrado, use_container_width=True, height=400)
-                    
-                    # Botón para descargar
-                    csv = df_filtrado.to_csv(index=False)
-                    st.download_button(
-                        label="📥 Descargar datos filtrados",
-                        data=csv,
-                        file_name=f"lesiones_filtradas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                        mime="text/csv"
-                    )
-                else:
-                    st.warning("⚠️ No se encontraron registros con los filtros seleccionados")
+                # ============================================
+                # TAB 2: NUEVO DASHBOARD DE TENDENCIAS
+                # ============================================
+                with tab2:
+                    mostrar_dashboard_tendencias_lesiones(df)
                 
             else:
                 st.error("❌ No se pudieron cargar los datos")
                 
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
+
 
 
 # Ejecutar solo si es llamado directamente
