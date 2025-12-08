@@ -4,6 +4,7 @@ Centralizacion de Módulos: Área Médica, Nutrición y Física
 Desarrollado con Streamlit
 """
 import streamlit as st
+import pandas as pd
 import os
 import sys
 import json
@@ -11,7 +12,6 @@ import hashlib
 from datetime import datetime, date, timedelta
 from typing import Dict, List
 from google.oauth2 import service_account
-
 
 # Configuración de credenciales - Manejo de entornos local y producción
 credentials = None
@@ -306,40 +306,53 @@ class AuthManager:
         self.credentials_file = credentials_file
         self.ensure_credentials_file()
         
-        
     def ensure_credentials_file(self):
-        try:
-            with open(self.credentials_file, 'r', encoding='utf-8') as f:
-                json.load(f)
-        except FileNotFoundError:
-            default_users = {
-                "admin": {
-                    "password": self.hash_password("admin123"),
-                    "name": "Administrador",
-                    "email": "admin@car.com.ar",
-                    "role": "admin",
-                    "created_at": datetime.now().isoformat()
-                }
+        """Asegurar que existe el archivo de credenciales"""
+        # Crear carpeta si no existe
+        os.makedirs(os.path.dirname(self.credentials_file), exist_ok=True)
+        
+        # Hash correcto de la contraseña "Sistemacar2026"
+        correct_hash = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"
+        
+        # Usuario por defecto
+        default_users = {
+            "admin": {
+                "password": correct_hash,
+                "name": "Administrador",
+                "email": "admin@car.com.ar",
+                "role": "admin",
+                "created_at": datetime.now().isoformat()
             }
-            with open(self.credentials_file, 'w', encoding='utf-8') as f:
-                json.dump(default_users, f, indent=2, ensure_ascii=False)
+        }
+        
+        # Siempre sobrescribir para asegurar que esté correcto
+        with open(self.credentials_file, 'w', encoding='utf-8') as f:
+            json.dump(default_users, f, indent=2, ensure_ascii=False)
+        
+        print(f"✅ Credenciales regeneradas en: {self.credentials_file}")
     
     def hash_password(self, password: str) -> str:
+        """Generar hash SHA256 de la contraseña"""
         return hashlib.sha256(password.encode()).hexdigest()
     
     def authenticate(self, username: str, password: str) -> Dict:
+        """Autenticar usuario"""
         try:
             with open(self.credentials_file, 'r', encoding='utf-8') as f:
                 users = json.load(f)
             
             if username in users:
                 stored_password = users[username]['password']
-                if stored_password == self.hash_password(password):
+                input_password_hash = self.hash_password(password)
+                
+                if stored_password == input_password_hash:
                     return users[username]
             return None
-        except:
+        except Exception as e:
+            print(f"❌ Error en autenticación: {e}")
             return None
-
+        
+        
 class MedicalManager:
     def __init__(self):
         self.injuries_file = 'credentials/medical_records.json'
@@ -527,58 +540,202 @@ class NutritionManager:
             json.dump(data, f, indent=2, ensure_ascii=False)
 
 def login_page():
-    load_car_styles()
+    """Página de inicio de sesión con diseño mejorado - AUTENTICACIÓN HARDCODED"""
     
-    # Fondo con gradiente
-    st.markdown("""
+    import base64
+    
+    # Cargar y codificar la imagen de fondo
+    def get_base64_image(image_path):
+        try:
+            with open(image_path, "rb") as img_file:
+                return base64.b64encode(img_file.read()).decode()
+        except:
+            return None
+    
+    bg_image = get_base64_image("entrada.png")
+    
+    # CSS personalizado para el login con imagen de fondo
+    if bg_image:
+        bg_style = f"""
+        .stApp {{
+            background-image: url("data:image/png;base64,{bg_image}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            font-family: 'Inter', sans-serif;
+        }}
+        """
+    else:
+        bg_style = """
+        .stApp {
+            background: linear-gradient(135deg, #1A2C56 0%, #2C4A7A 50%, #6BB4E8 100%);
+            font-family: 'Inter', sans-serif;
+        }
+        """
+    
+    st.markdown(f"""
     <style>
-    .stApp {
-        background: linear-gradient(135deg, #1A2C56 0%, #2C4A7A 50%, #6BB4E8 100%);
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    
+    /* Ocultar elementos de Streamlit */
+    .stApp > header {{visibility: hidden;}}
+    .stDeployButton {{display: none;}}
+    footer {{visibility: hidden;}}
+    #MainMenu {{visibility: hidden;}}
+    
+    /* Fondo con imagen */
+    {bg_style}
+    
+    /* Overlay oscuro sobre la imagen */
+    .stApp::before {{
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(26, 44, 86, 0.65);
+        z-index: 0;
+    }}
+    
+    /* Contenedor principal */
+    .main .block-container {{
+        position: relative;
+        z-index: 1;
+        padding-top: 5rem;
+        max-width: 500px;
+        margin: 0 auto;
+    }}
+    
+    /* Título principal */
+    .login-title {{
+        text-align: center;
+        color: white;
+        margin-bottom: 3rem;
+        text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
+    }}
+    
+    .login-title h1 {{
+        font-size: 2.8rem;
+        font-weight: 700;
+        margin: 0;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+    }}
+    
+    .login-title h2 {{
+        font-size: 3.5rem;
+        font-weight: 800;
+        margin: 0.5rem 0 0 0;
+        letter-spacing: 8px;
+        color: #6BB4E8;
+    }}
+    
+    .login-subtitle {{
+        font-size: 1.1rem;
+        font-weight: 400;
+        margin-top: 0.5rem;
+        opacity: 0.95;
+        letter-spacing: 2px;
+    }}
+    
+    /* Inputs */
+    .stTextInput > div > div > input {{
+        background: white;
+        border: 2px solid #E0E0E0;
+        border-radius: 8px;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.95rem;
+        transition: all 0.3s ease;
+        max-width: 350px;
+        width: 100%;
+    }}
+    
+    .stTextInput > div {{
+        max-width: 350px;
+        margin: 0 auto;
+    }}
+    
+    .stTextInput > div > div > input:focus {{
+        border-color: #6BB4E8;
+        box-shadow: 0 0 0 2px rgba(107, 180, 232, 0.2);
+    }}
+    
+    /* Botón de ingresar */
+    .stButton > button {{
+        background: linear-gradient(135deg, #1A2C56 0%, #6BB4E8 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 0.6rem 1.5rem;
+        font-size: 0.95rem;
+        font-weight: 600;
+        letter-spacing: 1px;
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        max-width: 350px;
+        margin: 0 auto;
+        display: block;
+        margin-top: 1rem;
+    }}
+    
+    .stButton > button:hover {{
+        background: linear-gradient(135deg, #6BB4E8 0%, #1A2C56 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(107, 180, 232, 0.4);
+    }}
     </style>
     """, unsafe_allow_html=True)
     
+    # Título principal
     st.markdown("""
-    <div class="main-header">
-        <h1>🏉 Club Argentino de Rugby</h1>
-        <h3>Sistema de Digitalización</h3>
-        <p>Centralizacion de Módulos: Área Médica, Nutrición y Física</p>
+    <div class="login-title">
+        <h1>Club Argentino de Rugby</h1>
+        <h2>CAR</h2>
+        <p class="login-subtitle">ACCESO AL SISTEMA</p>
     </div>
     """, unsafe_allow_html=True)
     
-    auth_manager = AuthManager()
+    # Formulario de login - VERSIÓN SIMPLIFICADA CON HARDCODE
+    username = st.text_input("USUARIO", placeholder="Ingresa tu usuario", label_visibility="collapsed", key="username_input")
+    st.markdown('<div style="height: 1rem;"></div>', unsafe_allow_html=True)
     
-    col1, col2, col3 = st.columns([1, 2, 1])
+    password = st.text_input("CONTRASEÑA", type="password", placeholder="Ingresa tu contraseña", label_visibility="collapsed", key="password_input")
     
-    with col2:
-        st.markdown('<div class="login-container">', unsafe_allow_html=True)
-        st.markdown("### 🔐 Iniciar Sesión")
-        
-        username = st.text_input("👤 Usuario", placeholder="Ingresa tu usuario")
-        password = st.text_input("🔒 Contraseña", type="password", placeholder="Ingresa tu contraseña")
-        
-        remember_me = st.checkbox("🔄 Recordarme")
-        
-        if st.button("🚀 Ingresar", use_container_width=True):
-            if username and password:
-                user_data = auth_manager.authenticate(username, password)
-                if user_data:
-                    st.session_state.authenticated = True
-                    st.session_state.user_data = user_data
-                    st.session_state.username = username
-                    st.session_state.remember_me = remember_me
-                    st.success("✅ Acceso exitoso")
-                    st.rerun()
-                else:
-                    st.error("❌ Usuario o contraseña incorrectos")
-            else:
-                st.warning("⚠️ Por favor completa todos los campos")
-        
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Credenciales de prueba
-        st.info("🔑 **Credenciales de prueba:**\n\n**Usuario:** admin\n\n**Contraseña:** admin123")
-
+    remember_me = st.checkbox("🔄 Recordarme")
+    
+    if st.button("INGRESAR"):
+        # AUTENTICACIÓN HARDCODED - Sin archivo JSON
+        if username == "admin" and password == "Sistemacar2026":
+            st.session_state.authenticated = True
+            st.session_state.user_data = {
+                "name": "Administrador",
+                "email": "admin@car.com.ar",
+                "role": "admin",
+                "created_at": datetime.now().isoformat()
+            }
+            st.session_state.username = username
+            st.session_state.remember_me = remember_me
+            st.success("✅ Acceso exitoso")
+            st.rerun()
+        else:
+            st.error("❌ Usuario o contraseña incorrectos")
+            # Debug info (remover en producción)
+            st.info(f"🔍 Usuario ingresado: '{username}' | Contraseña: '{password}'")
+    
+    st.markdown("""
+    <div class="forgot-password" style="text-align: center; margin-top: 1rem;">
+        <a href="#" style="color: white; text-decoration: none;">¿Olvidaste tu contraseña?</a>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Credenciales de prueba (pequeño y discreto)
+    st.markdown("""
+    <div style="text-align: center; margin-top: 2rem; color: rgba(255,255,255,0.7); font-size: 0.85rem;">
+        <p>🔑 Credenciales de prueba: <strong>Consultar +2213571957</strong>
+    </div>
+    """, unsafe_allow_html=True)
 
 def medical_area():
     """Área médica usando el sistema completo de areamedica.py"""
@@ -854,66 +1011,267 @@ def main_dashboard():
 
 
 
+# ...existing code... (línea ~850 aprox, función dashboard_main)
+
 def dashboard_main():
-    """Dashboard principal del sistema CAR - Versión comercial simplificada"""
+    """Dashboard principal del sistema CAR - Versión comercial con branding profesional"""
     
-    # CSS personalizado con tu branding
+    # CSS personalizado con diseño premium
     st.markdown("""
     <style>
+    /* Hero Container con gradiente premium */
     .hero-container {
-        background: linear-gradient(135deg, #0B132B 0%, #1E90FF 100%);
-        padding: 3rem 2rem;
-        border-radius: 20px;
-        margin-bottom: 2rem;
+        background: linear-gradient(135deg, #0B132B 0%, #1C3A6E 50%, #1E90FF 100%);
+        padding: 3.5rem 2.5rem;
+        border-radius: 25px;
+        margin-bottom: 2.5rem;
         position: relative;
         overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     }
-    .hero-content {
-        flex: 2;
-        color: white;
+    
+    /* Efecto de brillo animado */
+    .hero-container::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: linear-gradient(45deg, 
+            transparent, 
+            rgba(57, 255, 20, 0.03), 
+            transparent
+        );
+        animation: shine 3s ease-in-out infinite;
     }
-    .hero-logo {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding-left: 2rem;
+    
+    @keyframes shine {
+        0% { transform: translateX(-100%) translateY(-100%) rotate(30deg); }
+        100% { transform: translateX(100%) translateY(100%) rotate(30deg); }
     }
+    
+    /* Títulos del hero - MEJORADOS PARA LEGIBILIDAD */
     .hero-title {
         color: white;
         font-size: 48px;
         font-weight: 900;
-        margin-bottom: 15px;
-        line-height: 1.1;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        margin-bottom: 20px;
+        line-height: 1.2;
+        text-shadow: 
+            3px 3px 8px rgba(0,0,0,0.8),
+            0 0 30px rgba(57, 255, 20, 0.3);
+        letter-spacing: -1px;
+        position: relative;
+        z-index: 2;
     }
+    
     .hero-accent {
         color: #39FF14;
+        text-shadow: 
+            3px 3px 8px rgba(0,0,0,0.8),
+            0 0 40px rgba(57, 255, 20, 0.6),
+            0 0 60px rgba(57, 255, 20, 0.4);
+        font-size: 56px;
+        display: block;
+        margin-top: 10px;
     }
+    
     .hero-subtitle {
-        color: rgba(255,255,255,0.9);
+        color: #FFFFFF;
         font-size: 22px;
-        font-weight: 400;
-        margin-bottom: 15px;
+        font-weight: 600;
+        margin-bottom: 18px;
+        line-height: 1.4;
+        text-shadow: 
+            2px 2px 6px rgba(0,0,0,0.7),
+            0 0 20px rgba(0,0,0,0.5);
+        position: relative;
+        z-index: 2;
     }
+    
     .hero-description {
-        color: rgba(255,255,255,0.8);
+        color: rgba(255,255,255,0.95);
         font-size: 17px;
         margin-bottom: 0;
-        line-height: 1.4;
+        line-height: 1.6;
+        text-shadow: 
+            2px 2px 4px rgba(0,0,0,0.6),
+            0 0 15px rgba(0,0,0,0.4);
+        position: relative;
+        z-index: 2;
+    }
+    
+    /* Sección de principios */
+    .principles-section {
+        margin-top: 3rem;
+    }
+    
+    .section-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 3px solid #1E90FF;
+    }
+    
+    .section-icon {
+        font-size: 2.5rem;
+        margin-right: 1rem;
+    }
+    
+    .section-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1A2C56;
+        margin: 0;
+    }
+    
+    /* Cards de principios */
+    .principle-card {
+        background: linear-gradient(135deg, #1A2C56 0%, #2C4A7A 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        margin-bottom: 1.5rem;
+        color: white;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    
+    .principle-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(30, 144, 255, 0.3);
+    }
+    
+    .principle-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 50px;
+        height: 50px;
+        background: #39FF14;
+        color: #0B132B;
+        border-radius: 12px;
+        font-size: 24px;
+        font-weight: 900;
+        margin-bottom: 1rem;
+        box-shadow: 0 5px 15px rgba(57, 255, 20, 0.3);
+    }
+    
+    .principle-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 0.8rem;
+        color: white;
+    }
+    
+    .principle-text {
+        font-size: 1rem;
+        line-height: 1.6;
+        opacity: 0.95;
+    }
+    
+    .principle-highlight {
+        color: #39FF14;
+        font-weight: 600;
+    }
+    
+    /* Why section */
+    .why-section {
+        margin-top: 3rem;
+        padding: 2rem;
+        background: linear-gradient(135deg, #F8F9FA 0%, #E9ECEF 100%);
+        border-radius: 20px;
+        border-left: 5px solid #FFC107;
+    }
+    
+    .why-title {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1A2C56;
+        margin-bottom: 2rem;
+        display: flex;
+        align-items: center;
+    }
+    
+    .why-title::before {
+        content: '💡';
+        font-size: 2.5rem;
+        margin-right: 1rem;
+    }
+    
+    /* Benefits grid */
+    .benefit-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+        height: 100%;
+        border-top: 4px solid #1E90FF;
+    }
+    
+    .benefit-icon {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+    }
+    
+    .benefit-title {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #1A2C56;
+        margin-bottom: 1rem;
+    }
+    
+    .benefit-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .benefit-list li {
+        padding: 0.5rem 0;
+        color: #495057;
+        display: flex;
+        align-items: flex-start;
+    }
+    
+    .benefit-list li::before {
+        content: '✓';
+        color: #28a745;
+        font-weight: bold;
+        margin-right: 0.5rem;
+        font-size: 1.2rem;
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+        .hero-title {
+            font-size: 32px;
+        }
+        
+        .hero-accent {
+            font-size: 38px;
+        }
+        
+        .hero-subtitle {
+            font-size: 16px;
+        }
+        
+        .section-title {
+            font-size: 1.5rem;
+        }
     }
     </style>
     """, unsafe_allow_html=True)
     
-    # Contenedor azul con título, subtítulo y logo
-    st.markdown("""
-    <div class="hero-container">
-        <div class="hero-content">
+    # Layout con dos columnas para hero - AJUSTADO LOGO MÁS PEQUEÑO
+    col_text, col_logo = st.columns([2.5, 1])
+    
+    with col_text:
+        st.markdown("""
+        <div class="hero-container">
             <h1 class="hero-title">
-                SISTEMA DE<br>
+                SISTEMA DE
                 <span class="hero-accent">RENDIMIENTO ELITE</span>
             </h1>
             <h2 class="hero-subtitle">
@@ -923,120 +1281,131 @@ def dashboard_main():
                 Centralizamos datos médicos, físicos y nutricionales para una toma de decisiones inteligente
             </p>
         </div>
-        <div class="hero-logo">
-    """, unsafe_allow_html=True)
-    
-    # Logo dentro del contenedor
-    try:
-        st.image(r"C:\Users\dell\Desktop\Car\logo.png", width=200)
-    except:
-        # Respaldo con logo estilizado
-        st.markdown("""
-        <div style="
-            background: linear-gradient(45deg, #39FF14, #1E90FF); 
-            width: 150px; height: 150px; 
-            border-radius: 20px; 
-            display: flex; align-items: center; justify-content: center; 
-            color: #0B132B; font-size: 36px; font-weight: 900;
-            margin: 0 auto;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-        ">
-            SRE
-        </div>
         """, unsafe_allow_html=True)
     
+    with col_logo:
+        # Logo más pequeño y centrado
+        try:
+            st.markdown('<div style="padding: 2rem 0; display: flex; justify-content: center;">', unsafe_allow_html=True)
+            st.image("logo.png", width=400)  # Tamaño reducido de logo
+            st.markdown('</div>', unsafe_allow_html=True)
+        except Exception as e:
+            st.markdown("""
+            <div style="
+                background: linear-gradient(45deg, #39FF14, #1E90FF);
+                border-radius: 20px;
+                padding: 1.5rem;
+                text-align: center;
+                color: white;
+                font-size: 2.5rem;
+                font-weight: 900;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+                width: 200px;
+                margin: 2rem auto;
+            ">
+                SRE
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Sección de Principios
     st.markdown("""
+    <div class="principles-section">
+        <div class="section-header">
+            <span class="section-icon">🚀</span>
+            <h2 class="section-title">Los Principios de la Digitalización Deportiva</h2>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
-    # Los Principios de la Digitalización - Versión Streamlit nativa
-    st.markdown("## 🚀 Los Principios de la Digitalización Deportiva")
-    st.markdown("---")
-    
     # Principio 1
-    st.markdown("### 1️⃣ **Capacitación Profesional**")
-    st.write("""
-    La digitalización exitosa comienza con profesionales capacitados. Nuestro sistema no solo te da las herramientas, 
-    sino que **forma a tu equipo** para maximizar el potencial de cada dato recopilado.
-    """)
+    st.markdown("""
+    <div class="principle-card">
+        <div class="principle-number">1</div>
+        <h3 class="principle-title">Capacitación Profesional</h3>
+        <p class="principle-text">
+            La digitalización exitosa comienza con <span class="principle-highlight">profesionales capacitados</span>. 
+            Nuestro sistema no solo te da las herramientas, sino que <span class="principle-highlight">forma a tu equipo</span> 
+            para maximizar el potencial de cada dato recopilado.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Principio 2  
-    st.markdown("### 2️⃣ **Centralización de Información**")
-    st.write("""
-    Todos los datos en un solo lugar: rendimiento físico, análisis técnico, bienestar del jugador y métricas de salud. 
-    La **centralización** elimina silos de información y permite una visión integral del atleta.
-    """)
+    # Principio 2
+    st.markdown("""
+    <div class="principle-card">
+        <div class="principle-number">2</div>
+        <h3 class="principle-title">Centralización de Información</h3>
+        <p class="principle-text">
+            Todos los datos en un solo lugar: rendimiento físico, análisis técnico, bienestar del jugador y 
+            <span class="principle-highlight">métricas de salud</span>. La centralización elimina silos de información 
+            y permite una <span class="principle-highlight">visión integral del atleta</span>.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Principio 3
-    st.markdown("### 3️⃣ **Toma de Decisiones Basada en Datos**")
-    st.write("""
-    Con información centralizada y profesionales capacitados, las decisiones dejan de ser intuitivas para convertirse en 
-    **estratégicas y fundamentadas**. Cada cambio de entrenamiento, cada rotación, cada plan nutricional tiene respaldo científico.
-    """)
+    st.markdown("""
+    <div class="principle-card">
+        <div class="principle-number">3</div>
+        <h3 class="principle-title">Toma de Decisiones Basada en Datos</h3>
+        <p class="principle-text">
+            Con información centralizada y profesionales capacitados, las decisiones dejan de ser intuitivas 
+            para convertirse en <span class="principle-highlight">estratégicas y fundamentadas</span>. Cada cambio 
+            de entrenamiento, cada rotación, cada plan nutricional tiene <span class="principle-highlight">respaldo científico</span>.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Beneficios de la Digitalización - Versión Streamlit nativa
-    st.markdown("## 💡 ¿Por qué digitalizar tu club deportivo?")
-    st.markdown("---")
+    # Sección "¿Por qué digitalizar?"
+    st.markdown("""
+    <div class="why-section">
+        <h2 class="why-title">¿Por qué digitalizar tu club deportivo?</h2>
+    </div>
+    """, unsafe_allow_html=True)
     
-    # Crear las 3 columnas
+    # Grid de beneficios
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.markdown("### 📈 **Mejora del Rendimiento**")
-        st.write("- **Monitoreo en tiempo real** de métricas clave de cada atleta")
-        st.write("- **Prevención de lesiones** mediante análisis predictivo")
-        st.write("- **Optimización de entrenamientos** basada en datos objetivos")
+        st.markdown("""
+        <div class="benefit-card">
+            <div class="benefit-icon">☑️</div>
+            <h3 class="benefit-title">Mejora del Rendimiento</h3>
+            <ul class="benefit-list">
+                <li>Monitoreo en tiempo real de métricas clave de cada atleta</li>
+                <li>Prevención de lesiones mediante análisis predictivo</li>
+                <li>Optimización de entrenamientos basada en datos objetivos</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col2:
-        st.markdown("### 🎯 **Ventaja Competitiva**")
-        st.write("- **Decisiones estratégicas** respaldadas por información precisa")
-        st.write("- **Identificación de talentos** mediante análisis de rendimiento")
-        st.write("- **Planificación táctica** con base en datos históricos y actuales")
+        st.markdown("""
+        <div class="benefit-card">
+            <div class="benefit-icon">🎯</div>
+            <h3 class="benefit-title">Ventaja Competitiva</h3>
+            <ul class="benefit-list">
+                <li>Decisiones estratégicas respaldadas por información precisa</li>
+                <li>Identificación de talentos mediante análisis de rendimiento</li>
+                <li>Planificación táctica con base en datos históricos y actuales</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col3:
-        st.markdown("### ⚡ **Eficiencia Operativa**")
-        st.write("- **Reducción de costos** en lesiones y tiempo perdido")
-        st.write("- **Automatización** de reportes y seguimiento")
-        st.write("- **Integración** de todas las áreas del club en una plataforma")
-    
-    # Solicitar Demo - Usando tu contenido de demo.py
-    st.markdown("""
-    <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); padding: 2rem; border-radius: 15px; margin: 2rem 0;">
-        <h2 style="color: #39FF14; text-align: center; margin-bottom: 2rem;">Solicitar Demo</h2>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    with st.form(key='demo_form'):
-        col1, col2 = st.columns(2)
-        with col1:
-            name = st.text_input('Nombre / Club', placeholder="Ej: Club Atlético San Lorenzo")
-            email = st.text_input('Email', placeholder="contacto@tuclub.com")
-        with col2:
-            phone = st.text_input('Teléfono (opcional)', placeholder="(011) 4XXX-XXXX")
-            club_type = st.selectbox('Tipo de Club', ['Rugby', 'Fútbol', 'Hockey', 'Básquet', 'Otro'])
-        
-        message = st.text_area('Mensaje (qué querés ver en la demo)', placeholder="Contanos qué aspectos te interesan más del sistema...")
-        
-        submitted = st.form_submit_button('Enviar solicitud', use_container_width=True)
-        
-        if submitted:
-            if name and email:
-                st.success('🎉 Gracias — tu solicitud fue enviada. Nos comunicamos por email para coordinar la demo.')
-                st.info('📱 También podés contactarnos directamente por WhatsApp: **+54 9 221 357-1957**')
-            else:
-                st.error('Por favor completá al menos el nombre y email')
-    
-    # Footer con tu información
-    st.markdown("""
-    <div style="color: rgba(255,255,255,0.6); font-size: 13px; padding: 2rem 0; text-align: center; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 2rem;">
-        <p><strong>SRE — Sistema de Rendimiento Élite</strong></p>
-        <p>📧 calvoj550@gmail.com • 📱 +54 9 221 357-1957</p>
-        <p>Desarrollado con ❤️ para la digitalización deportiva • © 2025</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    
+        st.markdown("""
+        <div class="benefit-card">
+            <div class="benefit-icon">⚡</div>
+            <h3 class="benefit-title">Eficiencia Operativa</h3>
+            <ul class="benefit-list">
+                <li>Reducción de costos en lesiones y tiempo perdido</li>
+                <li>Automatización de reportes y seguimiento</li>
+                <li>Integración de todas las áreas del club en una plataforma</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+
+
 
 def settings_page():
     st.markdown("""
