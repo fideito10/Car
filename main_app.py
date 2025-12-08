@@ -599,25 +599,30 @@ def login_page():
         z-index: 0;
     }}
     
-    /* Contenedor principal */
+    /* Contenedor principal - CENTRADO VERTICAL */
     .main .block-container {{
         position: relative;
         z-index: 1;
-        padding-top: 5rem;
-        max-width: 500px;
-        margin: 0 auto;
+        padding-top: 3rem !important;
+        padding-bottom: 3rem !important;
+        max-width: 450px !important;
+        margin: 0 auto !important;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        min-height: 100vh;
     }}
     
     /* Título principal */
     .login-title {{
         text-align: center;
         color: white;
-        margin-bottom: 3rem;
+        margin-bottom: 2.5rem;
         text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.8);
     }}
     
     .login-title h1 {{
-        font-size: 2.8rem;
+        font-size: 2.2rem;
         font-weight: 700;
         margin: 0;
         letter-spacing: 1px;
@@ -625,7 +630,7 @@ def login_page():
     }}
     
     .login-title h2 {{
-        font-size: 3.5rem;
+        font-size: 3rem;
         font-weight: 800;
         margin: 0.5rem 0 0 0;
         letter-spacing: 8px;
@@ -633,14 +638,24 @@ def login_page():
     }}
     
     .login-subtitle {{
-        font-size: 1.1rem;
+        font-size: 1rem;
         font-weight: 400;
         margin-top: 0.5rem;
         opacity: 0.95;
         letter-spacing: 2px;
     }}
     
-    /* Inputs */
+    /* Container del formulario */
+    .login-form-container {{
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        padding: 2rem;
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }}
+        
+    /* Inputs - MÁS COMPACTOS */
     .stTextInput > div > div > input {{
         background: white;
         border: 2px solid #E0E0E0;
@@ -651,39 +666,83 @@ def login_page():
         max-width: 350px;
         width: 100%;
     }}
-    
+
     .stTextInput > div {{
         max-width: 350px;
         margin: 0 auto;
     }}
-    
-    .stTextInput > div > div > input:focus {{
-        border-color: #6BB4E8;
-        box-shadow: 0 0 0 2px rgba(107, 180, 232, 0.2);
+        
+    /* Checkbox */
+    .stCheckbox {{
+        margin: 1rem 0 1.5rem 0;
     }}
     
-    /* Botón de ingresar */
+    /* Botón de ingresar - MODIFICADO SIN WIDTH 100% */
     .stButton > button {{
-        background: linear-gradient(135deg, #1A2C56 0%, #6BB4E8 100%);
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 0.6rem 1.5rem;
-        font-size: 0.95rem;
-        font-weight: 600;
-        letter-spacing: 1px;
-        transition: all 0.3s ease;
-        text-transform: uppercase;
-        max-width: 350px;
-        margin: 0 auto;
-        display: block;
-        margin-top: 1rem;
+        background: linear-gradient(135deg, #1A2C56 0%, #6BB4E8 40%) !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 0.75rem 2rem !important;
+        font-size: 1rem !important;
+        font-weight: 600 !important;
+        letter-spacing: 1px !important;
+        transition: all 0.3s ease !important;
+        text-transform: uppercase !important;
+        margin: 1rem auto !important;
+        display: block !important;
+    }}
+
+    .stButton {{
+        text-align: center !important;
     }}
     
     .stButton > button:hover {{
-        background: linear-gradient(135deg, #6BB4E8 0%, #1A2C56 100%);
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(107, 180, 232, 0.4);
+        background: linear-gradient(135deg, #6BB4E8 0%, #1A2C56 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 8px 25px rgba(107, 180, 232, 0.4) !important;
+    }}
+    
+    /* Links */
+    .forgot-password {{
+        text-align: center;
+        margin-top: 1.5rem;
+    }}
+    
+    .forgot-password a {{
+        color: white;
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+    }}
+    
+    .forgot-password a:hover {{
+        color: #6BB4E8;
+        text-decoration: underline;
+    }}
+    
+    /* Credenciales de prueba */
+    .test-credentials {{
+        text-align: center;
+        margin-top: 2rem;
+        color: rgba(255,255,255,0.7);
+        font-size: 0.85rem;
+    }}
+    
+    /* Responsive */
+    @media (max-width: 768px) {{
+        .main .block-container {{
+            max-width: 90% !important;
+            padding: 1rem !important;
+        }}
+        
+        .login-title h1 {{
+            font-size: 1.8rem;
+        }}
+        
+        .login-title h2 {{
+            font-size: 2.5rem;
+        }}
     }}
     </style>
     """, unsafe_allow_html=True)
@@ -697,16 +756,19 @@ def login_page():
     </div>
     """, unsafe_allow_html=True)
     
-    # Formulario de login - VERSIÓN SIMPLIFICADA CON HARDCODE
-    username = st.text_input("USUARIO", placeholder="Ingresa tu usuario", label_visibility="collapsed", key="username_input")
-    st.markdown('<div style="height: 1rem;"></div>', unsafe_allow_html=True)
+    # Contenedor del formulario
+    st.markdown('<div class="login-form-container">', unsafe_allow_html=True)
     
-    password = st.text_input("CONTRASEÑA", type="password", placeholder="Ingresa tu contraseña", label_visibility="collapsed", key="password_input")
+    # Formulario de login
+    username = st.text_input("", placeholder="Usuario", label_visibility="collapsed", key="username_input")
+    password = st.text_input("", type="password", placeholder="Contraseña", label_visibility="collapsed", key="password_input")
     
+    # Checkbox también con max-width
+    st.markdown('<div style="max-width: 350px; margin: 0 auto;">', unsafe_allow_html=True)
     remember_me = st.checkbox("🔄 Recordarme")
+    st.markdown('</div>', unsafe_allow_html=True)
     
     if st.button("INGRESAR"):
-        # AUTENTICACIÓN HARDCODED - Sin archivo JSON
         if username == "admin" and password == "Sistemacar2026":
             st.session_state.authenticated = True
             st.session_state.user_data = {
@@ -721,21 +783,24 @@ def login_page():
             st.rerun()
         else:
             st.error("❌ Usuario o contraseña incorrectos")
-            # Debug info (remover en producción)
-            st.info(f"🔍 Usuario ingresado: '{username}' | Contraseña: '{password}'")
     
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Link de contraseña olvidada
     st.markdown("""
-    <div class="forgot-password" style="text-align: center; margin-top: 1rem;">
-        <a href="#" style="color: white; text-decoration: none;">¿Olvidaste tu contraseña?</a>
+    <div class="forgot-password">
+        <a href="#">¿Olvidaste tu contraseña?</a>
     </div>
     """, unsafe_allow_html=True)
     
-    # Credenciales de prueba (pequeño y discreto)
+    # Credenciales de prueba
     st.markdown("""
-    <div style="text-align: center; margin-top: 2rem; color: rgba(255,255,255,0.7); font-size: 0.85rem;">
-        <p>🔑 Credenciales de prueba: <strong>Consultar +2213571957</strong>
+    <div class="test-credentials">
+        <p>🔑 Credenciales de prueba: <strong>Consultar +2213571957</strong></p>
     </div>
     """, unsafe_allow_html=True)
+    
+    
 
 def medical_area():
     """Área médica usando el sistema completo de areamedica.py"""
