@@ -692,21 +692,39 @@ def login_page():
         outline: none;
     }}
         
-    /* Checkbox - MÁS PEQUEÑO */
+    /* Centrar y mejorar el checkbox "Recordarme" */
     .stCheckbox {{
-        margin: 0.6rem 0 !important;
+        width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        margin: 0.6rem 0 0.2rem 0 !important;
     }}
-
     .stCheckbox > div {{
         width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
     }}
-
     .stCheckbox label {{
         font-size: 0.85rem !important;
+        color: #fff !important;
     }}
-    
-    /* Botón de ingresar - COMPACTO */
+
+
+    /* Botón de ingresar - SIEMPRE CENTRADO Y RESPONSIVE */
+    .stButton {{
+        width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        margin: 1rem 0 0 0 !important;
+        padding: 0 !important;
+    }}
+
     .stButton > button {{
+        width: 100% !important;
+        max-width: 340px !important;
         background: linear-gradient(135deg, #1A2C56 0%, #6BB4E8 40%) !important;
         color: white !important;
         border: none !important;
@@ -717,26 +735,11 @@ def login_page():
         letter-spacing: 1px !important;
         transition: all 0.3s ease !important;
         text-transform: uppercase !important;
-        margin: 0.5rem auto !important;
+        margin: 0 auto !important;
         display: block !important;
-        width: auto !important;
+        box-sizing: border-box !important;
         height: 38px !important;
     }}
-
-    .stButton {{
-        text-align: center !important;
-        width: 100% !important;
-        margin-top: 0.5rem !important;
-    }}
-    
-     /* Botón centrado debajo de los inputs */
-    .stButton {{
-        width: 100% !important;
-        max-width: 340px !important;
-        margin: 1rem auto 0 auto !important;
-        text-align: center !important;
-    }}
-    
     /* Links */
     .forgot-password {{
         text-align: center;
@@ -806,7 +809,18 @@ def login_page():
             max-width: 340px !important;
         }}
     }}
-    </style>
+    @media (max-width: 480px) {{
+        .login-form-container {{
+            max-width: 98vw !important;
+            padding: 1rem !important;
+        }}
+        .stButton > button {{
+            max-width: 100vw !important;
+            font-size: 0.85rem !important;
+            padding: 0.45rem 0.5rem !important;
+        }}
+    }}
+     </style>
     """, unsafe_allow_html=True)
     
     # Título principal
@@ -821,30 +835,33 @@ def login_page():
     # Contenedor del formulario
     st.markdown('<div class="login-form-container">', unsafe_allow_html=True)
     
-    # Formulario de login
+
     username = st.text_input("", placeholder="Usuario", label_visibility="collapsed", key="username_input")
     password = st.text_input("", type="password", placeholder="Contraseña", label_visibility="collapsed", key="password_input")
     
-    remember_me = st.checkbox("🔄 Recordarme")
-    
-    if st.button("INGRESAR"):
-        if username == "admin" and password == "Sistemacar2026":
-            st.session_state.authenticated = True
-            st.session_state.user_data = {
-                "name": "Administrador",
-                "email": "admin@car.com.ar",
-                "role": "admin",
-                "created_at": datetime.now().isoformat()
-            }
-            st.session_state.username = username
-            st.session_state.remember_me = remember_me
-            st.success("✅ Acceso exitoso")
-            st.rerun()
-        else:
-            st.error("❌ Usuario o contraseña incorrectos")
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    
+    remember_me = st.checkbox("🔄 Recordarme", key="remember_me")
+
+    # Centrar botón debajo de la celda de contraseña
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("INGRESAR", use_container_width=True):
+            auth_manager = AuthManager()
+            user = auth_manager.authenticate(username.strip(), password)
+            if user:
+                st.session_state.authenticated = True
+                st.session_state.user_data = {
+                    "name": user.get("name", username),
+                    "email": user.get("email", "no-reply@car.com.ar"),
+                    "role": user.get("role", "user"),
+                    "created_at": user.get("created_at", datetime.now().isoformat())
+                }
+                st.session_state.username = username
+                st.session_state.remember_me = remember_me
+                st.success("✅ Acceso exitoso")
+                st.rerun()
+            else:
+                st.error("❌ Usuario o contraseña incorrectos")
+
     # Link de contraseña olvidada
     st.markdown("""
     <div class="forgot-password">
