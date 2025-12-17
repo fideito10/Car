@@ -305,53 +305,38 @@ class AuthManager:
     def __init__(self, credentials_file='credentials/users_credentials.json'):
         self.credentials_file = credentials_file
         self.ensure_credentials_file()
-        
+
     def ensure_credentials_file(self):
-        """Asegurar que existe el archivo de credenciales"""
-        # Crear carpeta si no existe
-        os.makedirs(os.path.dirname(self.credentials_file), exist_ok=True)
-        
-        # Hash correcto de la contraseña "Sistemacar2026"
-        correct_hash = "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918"
-        
-        # Usuario por defecto
-        default_users = {
-            "admin": {
-                "password": correct_hash,
-                "name": "Administrador",
-                "email": "admin@car.com.ar",
-                "role": "admin",
-                "created_at": datetime.now().isoformat()
+        if not os.path.exists(self.credentials_file):
+            os.makedirs(os.path.dirname(self.credentials_file), exist_ok=True)
+            default_user = {
+                "admin": {
+                    "password": self.hash_password("Sistemacar2026"),
+                    "name": "Administrador",
+                    "email": "admin@car.com.ar",
+                    "role": "admin",
+                    "created_at": datetime.now().isoformat()
+                }
             }
-        }
-        
-        # Siempre sobrescribir para asegurar que esté correcto
-        with open(self.credentials_file, 'w', encoding='utf-8') as f:
-            json.dump(default_users, f, indent=2, ensure_ascii=False)
-        
-        print(f"✅ Credenciales regeneradas en: {self.credentials_file}")
-    
+            with open(self.credentials_file, "w", encoding="utf-8") as f:
+                json.dump(default_user, f, indent=2)
+
     def hash_password(self, password: str) -> str:
-        """Generar hash SHA256 de la contraseña"""
-        return hashlib.sha256(password.encode()).hexdigest()
-    
+        import hashlib
+        return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
     def authenticate(self, username: str, password: str) -> Dict:
-        """Autenticar usuario"""
         try:
-            with open(self.credentials_file, 'r', encoding='utf-8') as f:
+            with open(self.credentials_file, "r", encoding="utf-8") as f:
                 users = json.load(f)
-            
             if username in users:
-                stored_password = users[username]['password']
-                input_password_hash = self.hash_password(password)
-                
-                if stored_password == input_password_hash:
-                    return users[username]
+                user = users[username]
+                if user["password"] == self.hash_password(password):
+                    return user
             return None
         except Exception as e:
-            print(f"❌ Error en autenticación: {e}")
+            print(f"Error autenticando: {e}")
             return None
-        
         
 class MedicalManager:
     def __init__(self):
@@ -840,27 +825,24 @@ def login_page():
     password = st.text_input("", type="password", placeholder="Contraseña", label_visibility="collapsed", key="password_input")
     
     remember_me = st.checkbox("🔄 Recordarme", key="remember_me")
-
-    # Centrar botón debajo de la celda de contraseña
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        if st.button("INGRESAR", use_container_width=True):
-            auth_manager = AuthManager()
-            user = auth_manager.authenticate(username.strip(), password)
-            if user:
-                st.session_state.authenticated = True
-                st.session_state.user_data = {
-                    "name": user.get("name", username),
-                    "email": user.get("email", "no-reply@car.com.ar"),
-                    "role": user.get("role", "user"),
-                    "created_at": user.get("created_at", datetime.now().isoformat())
-                }
-                st.session_state.username = username
-                st.session_state.remember_me = remember_me
-                st.success("✅ Acceso exitoso")
-                st.rerun()
-            else:
-                st.error("❌ Usuario o contraseña incorrectos")
+# Centrar botón (ELIMINAMOS LAS COLUMNAS, DEJAMOS QUE EL CSS ACTÚE)
+    if st.button("INGRESAR", use_container_width=True):
+        auth_manager = AuthManager()
+        user = auth_manager.authenticate(username.strip(), password)
+        if user:
+            st.session_state.authenticated = True
+            st.session_state.user_data = {
+                "name": user.get("name", username),
+                "email": user.get("email", "no-reply@car.com.ar"),
+                "role": user.get("role", "user"),
+                "created_at": user.get("created_at", datetime.now().isoformat())
+            }
+            st.session_state.username = username
+            #st.session_state.remember_me = remember_me
+            st.success("Acceso exitoso")
+            st.rerun()
+        else:
+            st.error("Usuario o contraseña incorrectos")
 
     # Link de contraseña olvidada
     st.markdown("""
